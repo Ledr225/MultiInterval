@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Show loading state
         statusMessage.textContent = 'Calculating...';
         statusMessage.className = 'status loading';
+        statusMessage.style.display = 'block'; // Ensure it's visible during calculation
         if (resultChart) {
             resultChart.destroy();
         }
@@ -63,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // --- MODIFICATION 1: Hide successful status message ---
-            statusMessage.style.display = 'none'; // Hide the element
+            statusMessage.style.display = 'none'; // Hide the element on success
 
             renderChart(data.plot_data);
 
@@ -88,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     data: plotData.y,
                     borderColor: 'rgb(54, 162, 235)',
                     backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    fill: 'origin', // Changed fill to 'origin' to prevent filling below the actual data points
+                    fill: 'origin', // MODIFICATION 2: Changed fill to 'origin' to prevent filling below the actual data points
                     borderWidth: 2,
                     pointRadius: 0,
                     tension: 0.1
@@ -105,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     y: { 
                         beginAtZero: true, 
                         title: { display: true, text: 'Probability Density' },
-                        // --- MODIFICATION 3: Hide Y-axis labels ---
+                        // MODIFICATION 3: Hide Y-axis labels and horizontal grid lines
                         ticks: {
                             display: false // Hide the actual tick labels
                         },
