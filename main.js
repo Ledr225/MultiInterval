@@ -121,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false, // <--- Add this line to disable animation
                 scales: {
                     x: { type: 'linear', title: { display: true, text: 'Value' } },
                     y: { beginAtZero: true, title: { display: true, text: 'Probability Density' } }
