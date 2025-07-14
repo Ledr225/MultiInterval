@@ -47,21 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
         calculateBtn.disabled = true;
 
         try {
-            // Ensure the Python code is re-run with the latest version
             await pyodide.runPythonAsync(pythonCode);
             const pythonResultPyProxy = await pyodide.globals.get('run_calculation')(expr, minSample);
             
-            // Convert PyProxy to JS object.
             const data = pythonResultPyProxy.toJs({ dict_converter: Object.fromEntries });
-            pythonResultPyProxy.destroy(); // Clean up PyProxy object
-
-            // --- IMPORTANT: Robust checks for plotData ---
-            if (!data) {
-                statusMessage.textContent = 'Error: Python calculation returned no data or an invalid data format.';
-                statusMessage.className = 'status error';
-                console.error('Python calculation returned null or undefined data:', pythonResultPyProxy); 
-                return;
-            }
+            pythonResultPyProxy.destroy();
 
             if (data.error) {
                 statusMessage.textContent = `Error: ${data.error}`;
@@ -71,15 +61,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             let plotDataForChart = null;
-
-            // Explicitly handle data.plot_data if it's a Map
             if (data.plot_data instanceof Map) {
                 plotDataForChart = {
                     x: data.plot_data.get('x'),
                     y: data.plot_data.get('y')
                 };
             } else if (data.plot_data && typeof data.plot_data === 'object') {
-                // If it's a plain object (as ideally desired after dict_converter)
                 plotDataForChart = data.plot_data;
             } else {
                 statusMessage.textContent = 'Error: Plot data is missing or has an unexpected format.';
@@ -88,16 +75,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Final check that x and y are arrays
             if (!plotDataForChart || !Array.isArray(plotDataForChart.x) || !Array.isArray(plotDataForChart.y)) {
                 statusMessage.textContent = 'Error: Plot data (x/y components) are not valid arrays. Cannot render chart.';
                 statusMessage.className = 'status error';
                 console.error('Plot data components are not arrays:', plotDataForChart);
                 return;
             }
-            // --- End of robust checks ---
 
-            // **MODIFICATION for status message removal:**
+            // Always hide status message on successful plot rendering
             statusMessage.textContent = ''; // Clear text content
             statusMessage.className = 'status'; // Reset class to `display: none;` from CSS
 
@@ -138,7 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     y: { beginAtZero: true, title: { display: true, text: 'Probability Density' } }
                 },
                 plugins: {
-                    title: { display: true, text: `Result Distribution for: ${expressionInput.value}` }
+                    // Removed the chart title
+                    title: { display: false } 
                 }
             }
         });
