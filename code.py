@@ -227,4 +227,71 @@ def auto_eval_expression(rpn, minimum_sample, max_prec=1000000):
     result = []
     while prec <= max_prec:
         result = eval_rpn(rpn, prec)
-        if len(result) >= minimum
+        if len(result) >= minimum_sample:
+            return result, prec
+        prec *= 2
+    return result, prec
+
+def generate_plot_data(values):
+    values = np.array(values)
+    values = values[np.isfinite(values)]
+    if len(values) < 2:
+        if len(np.unique(values)) == 1:
+            single_val = values[0]
+            # For a single point, create a very narrow spike around it
+            delta = max(0.01, abs(single_val) * 0.001)
+            x_vals = [single_val - delta, single_val, single_val + delta]
+            y_vals = [0, 1 / (2 * delta), 0] # A triangular "distribution" for visualization
+            return x_vals, y_vals
+        return None, None
+
+    try:
+        kde = gaussian_kde(values, bw_method=0.01)
+        x_min_data, x_max_data = np.min(values), np.max(values)
+        
+        # --- MODIFIED: Adjusted x_min_plot and x_max_plot calculation ---
+        # If the range is very small, still give it a small default plot range
+        if x_max_data - x_min_data < 1e-9:
+            mean_val = np.mean(values)
+            x_min_plot = mean_val - 0.05 # Smaller padding for tiny ranges
+            x_max_plot = mean_val + 0.05
+        else:
+            # Set plot range exactly to data min/max, no extra epsilon
+            x_min_plot = x_min_data
+            x_max_plot = x_max_data
+        # --- END MODIFIED SECTION ---
+
+        x_vals = np.linspace(x_min_plot, x_max_plot, 500)
+        y_vals = kde(x_vals)
+
+        y_vals[y_vals < 0] = 0
+
+        return x_vals.tolist(), y_vals.tolist()
+    except Exception as e:
+        print(f"Error generating plot data: {e}")
+        return None, None
+
+# --- Main function to be called from JavaScript ---
+def run_calculation(expr, min_sample_str):
+    try:
+        minimum_sample = int(min_sample_str)
+        tokens = tokenize(expr)
+        rpn = shunting_yard(tokens)
+        result, used_prec = auto_eval_expression(rpn, minimum_sample)
+
+        if not result:
+            return {"error": "Calculation resulted in no valid data points."}
+        
+        x_data, y_data = generate_plot_data(result)
+
+        if x_data is None:
+            return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for KDE."}
+
+        return {
+            "plot_data": {
+                "x": x_data,
+                "y": y_data
+            }
+        }
+    except Exception as e:
+        return {"error": f"An error occurred: {e}"}
