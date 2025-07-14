@@ -3,14 +3,15 @@ import operator
 import numpy as np
 from scipy.stats import gaussian_kde
 
-# --- All your original classes and functions go here ---
-# (Interval, parse_interval, MultiInterval, parse_multiinterval, Token, tokenize,
-#  shunting_yard, eval_rpn, auto_eval_expression, etc.)
+# ... (Previous classes and functions like Interval, parse_interval, MultiInterval, parse_multiinterval, Token, tokenize, shunting_yard, ops_map, eval_rpn, auto_eval_expression remain unchanged as per your previous request) ...
 
 class Interval:
     def __init__(self, low, high, low_closed=True, high_closed=True):
         self.low = float(low)
         self.high = float(high)
+        # For simplicity with the new strict parsing, we'll assume intervals parsed are always closed.
+        # If open/closed is still desired, the parsing logic needs to be extended to handle it explicitly
+        # with square brackets, e.g., '[1,5)' or '(1,5]', but the current request implies '[]' for all.
         self.low_closed = low_closed
         self.high_closed = high_closed
 
@@ -33,50 +34,78 @@ class Interval:
 
 def parse_interval(s):
     s = s.strip()
-    match = re.match(r'^([\[\(])\s*([-\d\.]+)\s*,\s*([-\d\.]+)\s*([\]\)])$', s)
+    # Modified regex to only allow square brackets for intervals
+    match = re.match(r'^\[\s*([-\d\.]+)\s*,\s*([-\d\.]+)\s*\]$', s)
     if not match:
-        raise ValueError(f"Invalid interval syntax: {s}")
-    low_closed = match.group(1) == '['
-    high_closed = match.group(4) == ']'
-    low = float(match.group(2))
-    high = float(match.group(3))
+        raise ValueError(f"Invalid interval syntax. Must use square brackets, e.g., [1,2]: {s}")
+    
+    # Since only square brackets are allowed, they are always closed.
+    low_closed = True
+    high_closed = True
+    
+    low = float(match.group(1))
+    high = float(match.group(2))
+    
+    # Ensure low <= high; swap if necessary and maintain closed status.
     if low > high:
         low, high = high, low
-        low_closed, high_closed = high_closed, low_closed
+        # The closed status remains the same since both are square brackets.
+        
     return Interval(low, high, low_closed, high_closed)
 
 class MultiInterval:
     def __init__(self, intervals):
-        self.intervals = intervals
+        # Ensure all elements in the list are indeed Interval objects
+        if not all(isinstance(i, Interval) for i in intervals):
+            raise TypeError("All elements in MultiInterval must be Interval objects.")
+        self.intervals = sorted(intervals, key=lambda x: x.low) # Optional: keep intervals sorted
 
     def sample(self, prec):
         points = []
         for interval in self.intervals:
             points.extend(interval.sample(prec))
         return points
+    
+    def __repr__(self):
+        return f"{{{', '.join(str(i) for i in self.intervals)}}}"
+
 
 def parse_multiinterval(s):
     s = s.strip()
     if not (s.startswith('{') and s.endswith('}')):
         raise ValueError("Multi-interval must be enclosed in { }")
     inner = s[1:-1].strip()
+    
     parts = []
-    depth = 0
-    buf = ''
-    for ch in inner:
-        if ch in '[(':
-            depth += 1
-        elif ch in '])':
-            depth -= 1
-        if ch == ',' and depth == 0:
-            parts.append(buf.strip())
-            buf = ''
+    current_part = []
+    bracket_depth = 0
+    for char in inner:
+        if char == '[':
+            bracket_depth += 1
+            current_part.append(char)
+        elif char == ']':
+            bracket_depth -= 1
+            current_part.append(char)
+        elif char == ',' and bracket_depth == 0:
+            parts.append("".join(current_part).strip())
+            current_part = []
         else:
-            buf += ch
-    if buf:
-        parts.append(buf.strip())
-    intervals = [parse_interval(part) for part in parts]
+            current_part.append(char)
+    
+    if current_part: # Add the last part
+        parts.append("".join(current_part).strip())
+
+    if not parts or (len(parts) == 1 and not parts[0]): # Handle empty multi-interval {}
+        return MultiInterval([])
+
+    intervals = []
+    for part in parts:
+        if not part: # Skip empty parts that might result from trailing/leading commas
+            continue
+        intervals.append(parse_interval(part)) # Use the updated parse_interval
+
     return MultiInterval(intervals)
+
 
 token_specification = [
     ('NUMBER',   r'-?\d+(\.\d+)?'),
@@ -89,8 +118,8 @@ token_specification = [
     ('SUB',      r'-'),
     ('LPAREN',   r'\('),
     ('RPAREN',   r'\)'),
-    ('MULTIINT', r'\{[^}]*\}'),
-    ('INTERVAL', r'[\[\(][^\]\)]*[\]\)]'),
+    ('MULTIINT', r'\{(\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*,?)*\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*\}|\{\}'), # Allows empty {} and intervals with []
+    ('INTERVAL', r'\[[-\d\.]+,\s*[-\d\.]+\]'), # Only allows [num,num]
     ('SKIP',     r'[ \t]+'),
 ]
 
@@ -110,7 +139,7 @@ def tokenize(code):
     while pos < len(code):
         m = get_token(code, pos)
         if not m:
-            raise SyntaxError(f'Invalid character at position {pos}')
+            raise SyntaxError(f'Invalid character or token at position {pos} in expression: "{code}"')
         typ = m.lastgroup
         val = m.group(typ)
         if typ != 'SKIP':
@@ -149,6 +178,9 @@ def shunting_yard(tokens):
             if not stack:
                 raise SyntaxError("Mismatched parentheses")
             stack.pop()
+        else: # Handle unexpected tokens that might slip through
+            raise SyntaxError(f"Unexpected token in shunting-yard: {token.type} ({token.value})")
+
     while stack:
         if stack[-1].type in ('LPAREN', 'RPAREN'):
             raise SyntaxError("Mismatched parentheses")
@@ -209,16 +241,53 @@ def generate_plot_data(values):
     values = np.array(values)
     values = values[np.isfinite(values)]
     if len(values) < 2:
-        return None, None
-    
+        # If there's only one unique value (or zero/one value total), KDE might fail or be meaningless.
+        # Handle this by returning the single value for plotting or indicating no distribution.
+        if len(np.unique(values)) == 1:
+            # For a single point, we can return a very narrow distribution around it
+            single_val = values[0]
+            # Create a very small range for the spike
+            delta = max(0.01, abs(single_val) * 0.001) # Ensure delta is not zero and scales slightly with value
+            x_vals = [single_val - delta, single_val, single_val + delta]
+            y_vals = [0, 1 / (2 * delta), 0] # Make the peak proportional to 1/width for unit area approximation
+            return x_vals, y_vals
+        return None, None # No meaningful data for KDE
+
     try:
-        kde = gaussian_kde(values, bw_method=0.01)
+        kde = gaussian_kde(values, bw_method=0.05) 
         x_min, x_max = np.min(values), np.max(values)
-        padding = (x_max - x_min) * 0.05
+        
+        # Handle cases where min and max are too close, leading to division by zero or very small range
+        if x_max - x_min < 1e-9: # If range is effectively zero
+            # If the range is extremely small, create a sensible default plotting range
+            mean_val = np.mean(values)
+            x_min = mean_val - 0.1
+            x_max = mean_val + 0.1
+
+        # Use a smaller padding to keep the plot tightly around the data.
+        # The 'useless line' is often caused by the plotting range extending far beyond data.
+        # Chart.js 'fill: origin' also helps ensure it doesn't draw below zero outside data range.
+        padding = (x_max - x_min) * 0.02 # Reduced padding from 0.05 to 0.02
         x_vals = np.linspace(x_min - padding, x_max + padding, 500)
         y_vals = kde(x_vals)
-        return x_vals.tolist(), y_vals.tolist()
-    except Exception:
+
+        # To try and explicitly cut off values where y is very close to zero:
+        # Find indices where y_vals are significant
+        significant_indices = np.where(y_vals > 1e-6)[0] # Threshold for "significant" density
+        if len(significant_indices) > 0:
+            first_significant = significant_indices[0]
+            last_significant = significant_indices[-1]
+            
+            # Extend slightly to include points just before/after the significant range for a smoother drop
+            start_index = max(0, first_significant - 5) 
+            end_index = min(len(x_vals) - 1, last_significant + 5)
+            
+            x_vals = x_vals[start_index:end_index+1].tolist()
+            y_vals = y_vals[start_index:end_index+1].tolist()
+
+        return x_vals, y_vals
+    except Exception as e:
+        print(f"Error generating plot data: {e}") # Log the error for debugging
         return None, None
 
 # --- Main function to be called from JavaScript ---
@@ -232,14 +301,15 @@ def run_calculation(expr, min_sample_str):
         if not result:
             return {"error": "Calculation resulted in no valid data points."}
         
-        status_message = f"Calculation successful. Used precision: {used_prec} (found {len(result)} sample points)."
+        # Removed status_message from here as it will not be displayed by JS
+        # status_message = f"Calculation successful. Used precision: {used_prec} (found {len(result)} sample points)."
         x_data, y_data = generate_plot_data(result)
 
         if x_data is None:
-             return {"error": "Could not generate a distribution. Result might be a single constant value."}
+             return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for KDE."}
 
         return {
-            "status": status_message,
+            "status": "Calculation completed.", # Simplified message, but will be hidden
             "plot_data": {
                 "x": x_data,
                 "y": y_data
