@@ -62,11 +62,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error);
             }
             
-            statusMessage.textContent = data.status;
-            statusMessage.className = 'status success';
+            // --- MODIFICATION 1: Hide successful status message ---
+            statusMessage.style.display = 'none'; // Hide the element
+
             renderChart(data.plot_data);
 
         } catch (error) {
+            // Only show error messages
+            statusMessage.style.display = 'block'; // Ensure error message is visible
             statusMessage.textContent = `Error: ${error.message}`;
             statusMessage.className = 'status error';
             console.error(error);
@@ -85,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     data: plotData.y,
                     borderColor: 'rgb(54, 162, 235)',
                     backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    fill: true,
+                    fill: 'origin', // Changed fill to 'origin' to prevent filling below the actual data points
                     borderWidth: 2,
                     pointRadius: 0,
                     tension: 0.1
@@ -95,11 +98,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: { type: 'linear', title: { display: true, text: 'Value' } },
-                    y: { beginAtZero: true, title: { display: true, text: 'Probability Density' } }
+                    x: { 
+                        type: 'linear', 
+                        title: { display: true, text: 'Value' } 
+                    },
+                    y: { 
+                        beginAtZero: true, 
+                        title: { display: true, text: 'Probability Density' },
+                        // --- MODIFICATION 3: Hide Y-axis labels ---
+                        ticks: {
+                            display: false // Hide the actual tick labels
+                        },
+                        grid: {
+                            drawOnChartArea: false // Optionally hide horizontal grid lines
+                        }
+                    }
                 },
                 plugins: {
-                    title: { display: true, text: `Result Distribution for: ${expressionInput.value}` }
+                    title: { display: true, text: `Result Distribution for: ${expressionInput.value}` },
+                    legend: {
+                        display: false // Optionally hide the dataset label 'Approximate Probability Density'
+                    }
                 }
             }
         });
