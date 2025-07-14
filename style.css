@@ -1,6 +1,6 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #1a1a1a; /* Dark background */
+    background-color: #000000; /* Pure black background for the entire website */
     color: #e0e0e0; /* Light text color */
     margin: 0;
     padding: 0;
@@ -71,9 +71,9 @@ header {
     padding-bottom: 0.5rem;
 }
 
-/* Card */
+/* Card (Area to enter stuff/plot) */
 .card {
-    background: #2a2a2a; /* Dark card background */
+    background: #0a0a0a; /* Slightly brighter black for the card background */
     padding: 1.5rem;
     border-radius: 2px;
     border: 1px solid #444; /* Darker border */
@@ -88,33 +88,33 @@ header {
     width: 100%; 
     padding: 0.75rem; 
     border-radius: 2px; 
-    border: 1px solid #555; /* Darker input border */
-    background-color: #3a3a3a; /* Dark input background */
+    border: 1px solid #333333; /* Darker input border */
+    background-color: #1a1a1a; /* Dark input background */
     color: #e0e0e0; /* Light input text */
     font-size: 1rem; 
     box-sizing: border-box; 
 }
 
-/* Button */
-#calculate-btn { /* Targeted specifically by ID */
+/* Calculate Button */
+#calculate-btn { 
     width: 100%;
     padding: 0.75rem;
     font-size: 1rem;
     font-weight: 600;
-    color: #1a1a1a; /* Black text for the button */
-    background-color: #ffffff; /* White background for the button */
+    color: #000000; /* Black text for the button */
+    background-color: #e0e0e0; /* Slightly dimmer white for the button */
     border: none;
     border-radius: 2px;
     cursor: pointer;
     transition: background-color 0.2s, opacity 0.2s, color 0.2s; /* Add color to transition */
 }
 #calculate-btn:hover { 
-    background-color: #f0f0f0; /* Slightly off-white on hover */
+    background-color: #ffffff; /* Pure white on hover */
     color: #000000; /* Ensure text remains black on hover */
 }
 #calculate-btn:disabled { 
-    background-color: #cccccc; /* Light gray for disabled */
-    color: #888888; /* Darker gray text for disabled */
+    background-color: #555555; /* Darker gray for disabled */
+    color: #aaaaaa; /* Lighter gray text for disabled */
     cursor: not-allowed; 
 }
 
@@ -147,6 +147,6 @@ header {
 
 /* Chart.js specific color adjustments for dark theme */
 canvas {
-    background-color: #000000; /* Chart background set to black */
+    background-color: #0a0a0a; /* Chart background set to slightly brighter black */
     border-radius: 2px;
 }
