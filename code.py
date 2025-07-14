@@ -244,8 +244,8 @@ def generate_plot_data(values):
         return None, None
 
     try:
-        # Increased bw_method for smoother curves and fewer spikes
-        kde = gaussian_kde(values, bw_method=0.1) # Adjusted this line
+        # Reverted bw_method to 0.01 as per user's provided code for smoothing
+        kde = gaussian_kde(values, bw_method=0.01) # Adjusted this line
         x_min_data, x_max_data = np.min(values), np.max(values)
         
         if x_max_data - x_min_data < 1e-9:
@@ -283,7 +283,6 @@ def run_calculation(expr, min_sample_str):
         if x_data is None:
             return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for KDE."}
 
-        # IMPORTANT: No 'status' key when successful - JS will hide status by default
         return {
             "plot_data": {
                 "x": x_data,
