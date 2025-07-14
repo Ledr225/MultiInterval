@@ -3,17 +3,10 @@ import operator
 import numpy as np
 from scipy.stats import gaussian_kde
 
-# --- All your original classes and functions go here ---
-# (Interval, parse_interval, MultiInterval, parse_multiinterval, Token, tokenize,
-#  shunting_yard, eval_rpn, auto_eval_expression, etc.)
-
 class Interval:
     def __init__(self, low, high, low_closed=True, high_closed=True):
         self.low = float(low)
         self.high = float(high)
-        # For simplicity with the new strict parsing, we'll assume intervals parsed are always closed.
-        # If open/closed is still desired, the parsing logic needs to be extended to handle it explicitly
-        # with square brackets, e.g., '[1,5)' or '(1,5]', but the current request implies '[]' for all.
         self.low_closed = low_closed
         self.high_closed = high_closed
 
@@ -36,31 +29,28 @@ class Interval:
 
 def parse_interval(s):
     s = s.strip()
-    # Modified regex to only allow square brackets for intervals
-    match = re.match(r'^\[\s*([-\d\.]+)\s*,\s*([-\d\.]+)\s*\]$', s)
+    # Reverting to original parsing for open/closed intervals
+    match = re.match(r'^([\[\(])\s*([-\d\.]+)\s*,\s*([-\d\.]+)\s*([\]\)])$', s)
     if not match:
-        raise ValueError(f"Invalid interval syntax. Must use square brackets, e.g., [1,2]: {s}")
-    
-    # Since only square brackets are allowed, they are always closed.
-    low_closed = True
-    high_closed = True
-    
-    low = float(match.group(1))
-    high = float(match.group(2))
-    
-    # Ensure low <= high; swap if necessary and maintain closed status.
+        raise ValueError(f"Invalid interval syntax: {s}")
+    low_closed = match.group(1) == '['
+    high_closed = match.group(4) == ']'
+    low = float(match.group(2))
+    high = float(match.group(3))
+    # Note: user's parse_interval swaps low/high and open/closed status if low > high.
+    # This might be intended for symmetry, let's keep that behavior.
     if low > high:
         low, high = high, low
-        # The closed status remains the same since both are square brackets.
-        
+        low_closed, high_closed = high_closed, low_closed
     return Interval(low, high, low_closed, high_closed)
 
 class MultiInterval:
     def __init__(self, intervals):
+        # User's provided code does not sort intervals here.
         # Ensure all elements in the list are indeed Interval objects
         if not all(isinstance(i, Interval) for i in intervals):
             raise TypeError("All elements in MultiInterval must be Interval objects.")
-        self.intervals = sorted(intervals, key=lambda x: x.low) # Optional: keep intervals sorted
+        self.intervals = intervals # User's code does not sort here
 
     def sample(self, prec):
         points = []
@@ -71,7 +61,6 @@ class MultiInterval:
     def __repr__(self):
         return f"{{{', '.join(str(i) for i in self.intervals)}}}"
 
-
 def parse_multiinterval(s):
     s = s.strip()
     if not (s.startswith('{') and s.endswith('}')):
@@ -79,23 +68,22 @@ def parse_multiinterval(s):
     inner = s[1:-1].strip()
     
     parts = []
-    current_part = []
-    bracket_depth = 0
-    for char in inner:
-        if char == '[':
-            bracket_depth += 1
-            current_part.append(char)
-        elif char == ']':
-            bracket_depth -= 1
-            current_part.append(char)
-        elif char == ',' and bracket_depth == 0:
-            parts.append("".join(current_part).strip())
-            current_part = []
+    depth = 0 # To track nested brackets for intervals
+    buf = ''
+    for ch in inner:
+        if ch in '[(':
+            depth += 1
+        elif ch in '])':
+            depth -= 1
+        
+        if ch == ',' and depth == 0: # Only split by comma if not inside an interval
+            parts.append(buf.strip())
+            buf = ''
         else:
-            current_part.append(char)
+            buf += ch
     
-    if current_part: # Add the last part
-        parts.append("".join(current_part).strip())
+    if buf: # Add the last part if any
+        parts.append(buf.strip())
 
     if not parts or (len(parts) == 1 and not parts[0]): # Handle empty multi-interval {}
         return MultiInterval([])
@@ -104,7 +92,7 @@ def parse_multiinterval(s):
     for part in parts:
         if not part: # Skip empty parts that might result from trailing/leading commas
             continue
-        intervals.append(parse_interval(part)) # Use the updated parse_interval
+        intervals.append(parse_interval(part))
 
     return MultiInterval(intervals)
 
@@ -119,9 +107,10 @@ token_specification = [
     ('ADD',      r'\+'),
     ('SUB',      r'-'),
     ('LPAREN',   r'\('),
-    ('RPAREN',   r'\)'),
-    ('MULTIINT', r'\{(\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*,?)*\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*\}|\{\}'), # Allows empty {} and intervals with []
-    ('INTERVAL', r'\[[-\d\.]+,\s*[-\d\.]+\]'), # Only allows [num,num]
+    ('RPAREN',   r'\)',),
+    # Reverting regex for MULTIINT and INTERVAL to match user's provided file
+    ('MULTIINT', r'\{[^}]*\}'), # More general, relies on parse_multiinterval for detail
+    ('INTERVAL', r'[\[\(][^\]\)]*[\]\)]'), # More general, relies on parse_interval for detail
     ('SKIP',     r'[ \t]+'),
 ]
 
@@ -199,131 +188,4 @@ def eval_rpn(rpn_tokens, prec):
     stack = []
     for token in rpn_tokens:
         if token.type == 'NUMBER':
-            stack.append([float(token.value)])
-        elif token.type == 'INTERVAL':
-            mi = MultiInterval([parse_interval(token.value)])
-            stack.append(mi.sample(prec))
-        elif token.type == 'MULTIINT':
-            mi = parse_multiinterval(token.value)
-            stack.append(mi.sample(prec))
-        elif token.type in ops_map:
-            if len(stack) < 2:
-                raise ValueError("Insufficient operands for operator")
-            b = stack.pop()
-            a = stack.pop()
-            func = ops_map[token.type]
-            result = []
-            for x in a:
-                for y in b:
-                    if func in (operator.truediv, operator.floordiv) and y == 0:
-                        continue
-                    try:
-                        r = func(x, y)
-                        result.append(r)
-                    except Exception:
-                        continue
-            stack.append(result)
-        else:
-            raise ValueError(f"Unknown token type: {token.type}")
-    if len(stack) != 1:
-        raise ValueError("Invalid expression structure")
-    return stack[0]
-
-def auto_eval_expression(rpn, minimum_sample, max_prec=1000000):
-    prec = 1
-    result = []
-    while prec <= max_prec:
-        result = eval_rpn(rpn, prec)
-        if len(result) >= minimum_sample:
-            return result, prec
-        prec *= 2
-    return result, prec
-
-def generate_plot_data(values):
-    values = np.array(values)
-    values = values[np.isfinite(values)]
-
-    if len(values) < 2:
-        # Handle single point or no data as before (spike or None)
-        if len(np.unique(values)) == 1 and len(values) > 0:
-            single_val = values[0]
-            delta = max(0.01, abs(single_val) * 0.001) 
-            x_vals = [single_val - delta, single_val, single_val + delta]
-            y_vals = [0, 1 / (2 * delta), 0]
-            return x_vals, y_vals
-        return None, None
-
-    try:
-        x_min_data, x_max_data = np.min(values), np.max(values)
-
-        if x_max_data - x_min_data < 1e-9:
-            mean_val = np.mean(values)
-            x_min_plot = mean_val - 0.1
-            x_max_plot = mean_val + 0.1
-        else:
-            epsilon = 1e-9 
-            x_min_plot = x_min_data - epsilon
-            x_max_plot = x_max_data + epsilon
-
-        # Number of bins for the histogram - still high to define sharp features
-        num_bins = 1000 
-        
-        counts, bin_edges = np.histogram(values, bins=num_bins, range=(x_min_plot, x_max_plot), density=True)
-
-        # Create a much denser set of x_coords for plotting (e.g., 5000 points)
-        # This will make the straight line segments in Chart.js appear smoother
-        num_plot_points = 5000 # Significantly more points for visual smoothness
-        dense_x_coords = np.linspace(x_min_plot, x_max_plot, num_plot_points)
-
-        plot_x = []
-        plot_y = []
-
-        # Map each dense_x_coord to its corresponding histogram bin value
-        for x_coord in dense_x_coords:
-            # Find which bin this x_coord belongs to
-            # np.digitize returns the index of the bin to which each value in x belongs.
-            # The bin_edges are sorted, so we can use searchsorted.
-            # Subtract 1 because digitize returns bin_idx (1-indexed for bins), or 0 for values < first bin.
-            # np.clip to handle values exactly equal to x_max_plot, placing them in the last bin
-            bin_idx = np.searchsorted(bin_edges, x_coord, side='right') - 1
-            bin_idx = np.clip(bin_idx, 0, len(counts) - 1) # Ensure index is within valid range
-
-            plot_x.append(x_coord)
-            plot_y.append(counts[bin_idx])
-
-        # Ensure y_vals are non-negative
-        plot_y = np.array(plot_y)
-        plot_y[plot_y < 0] = 0
-
-        return plot_x, plot_y.tolist()
-    except Exception as e:
-        print(f"Error generating plot data: {e}") 
-        return None, None
-
-# --- Main function to be called from JavaScript ---
-def run_calculation(expr, min_sample_str):
-    try:
-        minimum_sample = int(min_sample_str)
-        tokens = tokenize(expr)
-        rpn = shunting_yard(tokens)
-        result, used_prec = auto_eval_expression(rpn, minimum_sample)
-
-        if not result:
-            return {"error": "Calculation resulted in no valid data points."}
-        
-        # The 'status' field is included but JS will hide it on success.
-        status_message = "Calculation completed." 
-        x_data, y_data = generate_plot_data(result)
-
-        if x_data is None:
-             return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for plot."}
-
-        return {
-            "status": status_message, # This status will be passed, but JS will hide it on success
-            "plot_data": {
-                "x": x_data,
-                "y": y_data
-            }
-        }
-    except Exception as e:
-        return {"error": f"An error occurred: {e}"}
+            stack.append
