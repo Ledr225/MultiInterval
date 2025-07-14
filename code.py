@@ -103,14 +103,14 @@ def parse_multiinterval(s):
 
 
 token_specification = [
-    ('NUMBER',    r'-?\d+(\.\d+)?'),
     ('POW',       r'\^'),
     ('FLOORDIV', r'//'),
     ('MOD',       r'%'),
     ('MUL',       r'\*'),
     ('DIV',       r'/'),
     ('ADD',       r'\+'),
-    ('SUB',       r'-'),
+    ('SUB',       r'-'), # SUB must be before NUMBER to be tokenized correctly
+    ('NUMBER',    r'\d+(\.\d+)?'), # Changed to not include leading optional minus
     ('LPAREN',    r'\('),
     ('RPAREN',    r'\)'),
     ('MULTIINT', r'\{(\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*,?)*\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*\}|\{\}'),
@@ -153,10 +153,28 @@ operators = set(precedence.keys())
 def shunting_yard(tokens):
     output = []
     stack = []
+    
+    # Track the type of the last token added to the output or stack for unary minus detection
+    last_token_type = None 
+
     for token in tokens:
         if token.type in ('MULTIINT', 'INTERVAL', 'NUMBER'):
             output.append(token)
+            last_token_type = token.type
         elif token.type in operators:
+            # Unary minus detection
+            is_unary = False
+            if token.type == 'SUB':
+                # If it's the first token, or follows an operator, or follows an open parenthesis
+                if not last_token_type or last_token_type in operators or last_token_type == 'LPAREN':
+                    is_unary = True
+
+            if is_unary:
+                # Treat unary minus as 0 - X. Push 0 to output.
+                output.append(Token('NUMBER', '0'))
+                last_token_type = 'NUMBER' # The 0 is conceptually a number
+            
+            # Normal operator handling (binary subtraction or other ops)
             while (stack and stack[-1].type in operators):
                 top = stack[-1]
                 if ((token.type not in right_associative and precedence[top.type] >= precedence[token.type]) or
@@ -165,14 +183,19 @@ def shunting_yard(tokens):
                 else:
                     break
             stack.append(token)
+            last_token_type = token.type
         elif token.type == 'LPAREN':
             stack.append(token)
+            last_token_type = token.type
         elif token.type == 'RPAREN':
             while stack and stack[-1].type != 'LPAREN':
                 output.append(stack.pop())
             if not stack:
                 raise SyntaxError("Mismatched parentheses")
-            stack.pop()
+            stack.pop() # Pop the LPAREN
+            # After popping RPAREN, the last token type should be whatever was before the LPAREN.
+            # However, for simplicity, we can assume it's like a number/expression result.
+            last_token_type = 'NUMBER' # A closing parenthesis acts like a number for subsequent operations.
         else:
             raise SyntaxError(f"Unexpected token in shunting-yard: {token.type} ({token.value})")
 
@@ -249,17 +272,14 @@ def generate_plot_data(values):
         kde = gaussian_kde(values, bw_method=0.01)
         x_min_data, x_max_data = np.min(values), np.max(values)
         
-        # --- MODIFIED: Adjusted x_min_plot and x_max_plot calculation ---
-        # If the range is very small, still give it a small default plot range
+        # Set plot range exactly to data min/max, no extra epsilon
         if x_max_data - x_min_data < 1e-9:
             mean_val = np.mean(values)
             x_min_plot = mean_val - 0.05 # Smaller padding for tiny ranges
             x_max_plot = mean_val + 0.05
         else:
-            # Set plot range exactly to data min/max, no extra epsilon
             x_min_plot = x_min_data
             x_max_plot = x_max_data
-        # --- END MODIFIED SECTION ---
 
         x_vals = np.linspace(x_min_plot, x_max_plot, 500)
         y_vals = kde(x_vals)
