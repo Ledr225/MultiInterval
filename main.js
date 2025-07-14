@@ -26,54 +26,51 @@ document.addEventListener('DOMContentLoaded', () => {
             calculateAndPlot();
         } catch (error) {
             console.error('Pyodide initialization failed:', error);
-            loaderOverlay.innerHTML = `<div class="loader-content"><p>Error initializing environment.</p><small>${error.message}</small></div>`;
+            loaderOverlay.innerHTML = `<div class=\"loader-content\"><p>Error initializing environment.</p><small>${error.message}</small></div>`;
         }
     }
 
     // --- Calculation Logic ---
     async function calculateAndPlot() {
         if (!pyodide) {
-            statusMessage.textContent = 'Pyodide is not ready.';
+            statusMessage.textContent = 'Error: Python environment not loaded.';
             statusMessage.className = 'status error';
             return;
         }
 
-        // Show loading state
-        statusMessage.textContent = 'Calculating...';
-        statusMessage.className = 'status loading';
-        statusMessage.style.display = 'block'; // Ensure it's visible during calculation
-        if (resultChart) {
-            resultChart.destroy();
-        }
+        const expr = expressionInput.value;
+        const minSample = minSampleInput.value;
 
-        const expression = expressionInput.value;
-        const min_sample = minSampleInput.value;
+        statusMessage.textContent = 'Calculating...';
+        statusMessage.className = 'status info';
+        calculateBtn.disabled = true;
 
         try {
-            // Run the Python code in the Pyodide environment
-            pyodide.runPython(pythonCode);
-            // Get the main function from Python
-            const runCalculation = pyodide.globals.get('run_calculation');
-            // Call the function and get the result
-            const result = runCalculation(expression, min_sample);
-            const data = result.toJs({ dict_converter: Object.fromEntries }); // Convert Python dict to JS object
-            result.destroy(); // Clean up memory
+            // Ensure the Python code is re-run with the latest version
+            await pyodide.runPythonAsync(pythonCode);
+            const pythonResult = await pyodide.globals.get('run_calculation')(expr, minSample);
+            
+            // Convert PyProxy to JS object if necessary
+            const data = pythonResult.toJs ? pythonResult.toJs({ dictConverter: Object.fromEntries }) : pythonResult;
+            pythonResult.destroy(); // Clean up PyProxy object
 
             if (data.error) {
-                throw new Error(data.error);
+                statusMessage.textContent = `Error: ${data.error}`;
+                statusMessage.className = 'status error';
+                console.error(data.error);
+                return;
             }
-            
-            // --- MODIFICATION 1: Hide successful status message ---
-            statusMessage.style.display = 'none'; // Hide the element on success
 
+            statusMessage.textContent = data.status || 'Calculation successful.';
+            statusMessage.className = 'status success';
             renderChart(data.plot_data);
 
         } catch (error) {
-            // Only show error messages
-            statusMessage.style.display = 'block'; // Ensure error message is visible
             statusMessage.textContent = `Error: ${error.message}`;
             statusMessage.className = 'status error';
             console.error(error);
+        } finally {
+            calculateBtn.disabled = false;
         }
     }
 
@@ -89,37 +86,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     data: plotData.y,
                     borderColor: 'rgb(54, 162, 235)',
                     backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    fill: 'origin', // Changed fill to 'origin' to prevent filling below the actual data points
+                    fill: true,
                     borderWidth: 2,
                     pointRadius: 0,
-                    tension: 0 // MODIFICATION: Set tension to 0 to remove line smoothing
+                    // *** CHANGED: Set tension to 0 to remove Chart.js Bezier smoothing ***
+                    tension: 0 
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: { 
-                        type: 'linear', 
-                        title: { display: true, text: 'Value' } 
-                    },
-                    y: { 
-                        beginAtZero: true, 
-                        title: { display: true, text: 'Probability Density' },
-                        // Hide Y-axis labels and horizontal grid lines
-                        ticks: {
-                            display: false // Hide the actual tick labels
-                        },
-                        grid: {
-                            drawOnChartArea: false // Optionally hide horizontal grid lines
-                        }
-                    }
+                    x: { type: 'linear', title: { display: true, text: 'Value' } },
+                    y: { beginAtZero: true, title: { display: true, text: 'Probability Density' } }
                 },
                 plugins: {
-                    title: { display: true, text: `Result Distribution for: ${expressionInput.value}` },
-                    legend: {
-                        display: false // Optionally hide the dataset label 'Approximate Probability Density'
-                    }
+                    title: { display: true, text: `Result Distribution for: ${expressionInput.value}` }
                 }
             }
         });
