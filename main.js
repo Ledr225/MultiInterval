@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
             data: {
                 labels: plotData.x, 
                 datasets: [{
-                    label: 'Approximate Probability Density',
+                    label: 'Probability',
                     data: plotData.y,
                     borderColor: 'rgb(54, 162, 235)',
                     backgroundColor: 'rgba(54, 162, 235, 0.5)',
