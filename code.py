@@ -242,41 +242,48 @@ def auto_eval_expression(rpn, minimum_sample, max_prec=1000000):
 def generate_plot_data(values):
     values = np.array(values)
     values = values[np.isfinite(values)]
+
     if len(values) < 2:
-        # If there's only one unique value (or zero/one value total), KDE might fail or be meaningless.
-        # Handle this by returning the single value for plotting or indicating no distribution.
-        if len(np.unique(values)) == 1:
-            # For a single point, we can return a very narrow distribution around it
+        # Handle single point or no data as before (spike or None)
+        if len(np.unique(values)) == 1 and len(values) > 0:
             single_val = values[0]
-            # Create a very small range for the spike
-            delta = max(0.01, abs(single_val) * 0.001) # Ensure delta is not zero and scales slightly with value
+            delta = max(0.01, abs(single_val) * 0.001) 
             x_vals = [single_val - delta, single_val, single_val + delta]
-            y_vals = [0, 1 / (2 * delta), 0] # Make the peak proportional to 1/width for unit area approximation
+            y_vals = [0, 1 / (2 * delta), 0]
             return x_vals, y_vals
-        return None, None # No meaningful data for KDE
+        return None, None
 
     try:
-        # Using a slightly larger bandwidth for smoother curves, less prone to "bleeding" artifacts
-        kde = gaussian_kde(values, bw_method=0.001) 
+        # Determine the range of the data
         x_min_data, x_max_data = np.min(values), np.max(values)
-        
+
         # Handle cases where min and max are too close, leading to very small or zero range for plotting
         if x_max_data - x_min_data < 1e-9: # If data range is effectively zero
             mean_val = np.mean(values)
             x_min_plot = mean_val - 0.1 # Define a small arbitrary plotting range
             x_max_plot = mean_val + 0.1
         else:
-            # Generate x_vals strictly within the observed data range.
-            # Add a very small epsilon to the plotting range to ensure the curve's ends are visible,
-            # but without causing significant overflow.
-            epsilon = (x_max_data - x_min_data) * 0.01 # 1% of the data range
+            # Add a very small epsilon to ensure the ends of the distribution are captured by the bins.
+            epsilon = (x_max_data - x_min_data) * 0.005 # 0.5% of the data range
             x_min_plot = x_min_data - epsilon
             x_max_plot = x_max_data + epsilon
 
-        x_vals = np.linspace(x_min_plot, x_max_plot, 500)
-        y_vals = kde(x_vals)
+        # --- REPLACING KDE WITH HISTOGRAM FOR NO SMOOTHING ---
+        # Number of bins for the histogram - can be adjusted
+        num_bins = 100 # You can change this number to make the steps finer or coarser
+        
+        # Calculate histogram values (counts) and bin edges.
+        # density=True normalizes the histogram so that the integral over the range is 1,
+        # providing a direct density analogous to KDE but without smoothing.
+        counts, bin_edges = np.histogram(values, bins=num_bins, range=(x_min_plot, x_max_plot), density=True)
 
-        # Explicitly set negative probability densities (which can sometimes occur with KDE at boundaries) to zero
+        # Calculate bin centers for x_vals to plot the histogram
+        x_vals = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+        # 'y_vals' are the normalized counts (probability density from histogram)
+        y_vals = counts
+
+        # Ensure y_vals are non-negative
         y_vals[y_vals < 0] = 0
 
         return x_vals.tolist(), y_vals.tolist()
@@ -300,7 +307,7 @@ def run_calculation(expr, min_sample_str):
         x_data, y_data = generate_plot_data(result)
 
         if x_data is None:
-             return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for KDE."}
+             return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for plot."}
 
         return {
             "status": status_message, # This status will be passed, but JS will hide it on success
