@@ -108,10 +108,10 @@ document.addEventListener('DOMContentLoaded', () => {
             data: {
                 labels: plotData.x, 
                 datasets: [{
-                    label: 'Probability',
+                    // Removed 'label: 'Probability',' to remove the label from the graph
                     data: plotData.y,
-                    borderColor: 'rgb(54, 162, 235)',
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgb(0, 191, 255)', // Brighter blue (Deep Sky Blue)
+                    backgroundColor: 'rgba(0, 191, 255, 0.2)', // More transparent (0.2 alpha)
                     fill: true,
                     borderWidth: 2,
                     pointRadius: 0,
@@ -124,11 +124,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 animation: false, // <--- Add this line to disable animation
                 scales: {
                     x: { type: 'linear', title: { display: true, text: 'Value' } },
-                    y: { beginAtZero: true, title: { display: true, text: 'Probability Density' } }
+                    y: { beginAtZero: true, title: { display: true, true: 'Probability Density' } }
                 },
                 plugins: {
                     // Removed the chart title
-                    title: { display: false } 
+                    title: { display: false },
+                    legend: { // Add this to remove the legend (label) below the graph
+                        display: false
+                    }
                 }
             }
         });
