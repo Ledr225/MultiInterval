@@ -236,8 +236,8 @@ def generate_plot_data(values):
         return None, None
 
     try:
-        # *** CHANGED: Use 'silverman' for bw_method for more robust smoothing ***
-        kde = gaussian_kde(values, bw_method='silverman') 
+        # *** CHANGED: Explicitly set bw_method to 0.25 for more smoothing ***
+        kde = gaussian_kde(values, bw_method=0.25) 
 
         x_min_data, x_max_data = np.min(values), np.max(values)
         
