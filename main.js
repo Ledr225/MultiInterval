@@ -42,8 +42,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const expr = expressionInput.value;
         const minSample = minSampleInput.value;
 
-        statusMessage.textContent = 'Calculating...';
-        statusMessage.className = 'status loading'; // Set to loading state
+        // --- Removed "Calculating..." status message ---
+        // statusMessage.textContent = 'Calculating...';
+        // statusMessage.className = 'status loading'; 
+        // --- End removed section ---
+
         calculateBtn.disabled = true;
 
         try {
