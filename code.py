@@ -257,7 +257,7 @@ def generate_plot_data(values):
 
     try:
         # Using a slightly larger bandwidth for smoother curves, less prone to "bleeding" artifacts
-        kde = gaussian_kde(values, bw_method=0.01) 
+        kde = gaussian_kde(values, bw_method=0.001) 
         x_min_data, x_max_data = np.min(values), np.max(values)
         
         # Handle cases where min and max are too close, leading to very small or zero range for plotting
