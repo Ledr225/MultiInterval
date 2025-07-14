@@ -254,39 +254,45 @@ def generate_plot_data(values):
         return None, None
 
     try:
-        # Determine the range of the data
         x_min_data, x_max_data = np.min(values), np.max(values)
 
-        # Handle cases where min and max are too close, leading to very small or zero range for plotting
-        if x_max_data - x_min_data < 1e-9: # If data range is effectively zero
+        if x_max_data - x_min_data < 1e-9:
             mean_val = np.mean(values)
-            x_min_plot = mean_val - 0.1 # Define a small arbitrary plotting range
+            x_min_plot = mean_val - 0.1
             x_max_plot = mean_val + 0.1
         else:
-            # Add a very small epsilon to ensure the ends of the distribution are captured by the bins.
-            epsilon = (x_max_data - x_min_data) * 0.005 # 0.5% of the data range
+            # Use a very minimal epsilon, primarily to ensure bin edges cover the data range exactly
+            # and potentially extend slightly to show zero probability outside.
+            epsilon = (x_max_data - x_min_data) * 0.001 # Even smaller epsilon (0.1% of range)
             x_min_plot = x_min_data - epsilon
             x_max_plot = x_max_data + epsilon
 
-        # --- REPLACING KDE WITH HISTOGRAM FOR NO SMOOTHING ---
-        # Number of bins for the histogram - can be adjusted
-        num_bins = 100 # You can change this number to make the steps finer or coarser
+        # Number of bins for the histogram - increased for more detail if needed, but the step-like plot is key
+        num_bins = 200 # Increased number of bins to make steps finer
         
-        # Calculate histogram values (counts) and bin edges.
-        # density=True normalizes the histogram so that the integral over the range is 1,
-        # providing a direct density analogous to KDE but without smoothing.
         counts, bin_edges = np.histogram(values, bins=num_bins, range=(x_min_plot, x_max_plot), density=True)
 
-        # Calculate bin centers for x_vals to plot the histogram
-        x_vals = (bin_edges[:-1] + bin_edges[1:]) / 2
+        # Create step-like data for plotting by duplicating points
+        plot_x = []
+        plot_y = []
+        for i in range(len(counts)):
+            # Horizontal segment for the current bin
+            plot_x.append(bin_edges[i])
+            plot_y.append(counts[i])
+            
+            plot_x.append(bin_edges[i+1])
+            plot_y.append(counts[i])
+            
+            # Vertical line connecting to the next bin's height (if not the last bin)
+            if i < len(counts) - 1:
+                plot_x.append(bin_edges[i+1])
+                plot_y.append(counts[i+1])
 
-        # 'y_vals' are the normalized counts (probability density from histogram)
-        y_vals = counts
+        # Ensure y_vals are non-negative (though histogram counts should be)
+        plot_y = np.array(plot_y)
+        plot_y[plot_y < 0] = 0
 
-        # Ensure y_vals are non-negative
-        y_vals[y_vals < 0] = 0
-
-        return x_vals.tolist(), y_vals.tolist()
+        return plot_x, plot_y.tolist()
     except Exception as e:
         print(f"Error generating plot data: {e}") # Log the error for debugging
         return None, None
