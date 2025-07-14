@@ -89,10 +89,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     data: plotData.y,
                     borderColor: 'rgb(54, 162, 235)',
                     backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    fill: 'origin', // MODIFICATION 2: Changed fill to 'origin' to prevent filling below the actual data points
+                    fill: 'origin', // Changed fill to 'origin' to prevent filling below the actual data points
                     borderWidth: 2,
                     pointRadius: 0,
-                    tension: 0.1
+                    tension: 0 // MODIFICATION: Set tension to 0 to remove line smoothing
                 }]
             },
             options: {
@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     y: { 
                         beginAtZero: true, 
                         title: { display: true, text: 'Probability Density' },
-                        // MODIFICATION 3: Hide Y-axis labels and horizontal grid lines
+                        // Hide Y-axis labels and horizontal grid lines
                         ticks: {
                             display: false // Hide the actual tick labels
                         },
