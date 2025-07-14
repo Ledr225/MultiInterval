@@ -147,6 +147,6 @@ header {
 
 /* Chart.js specific color adjustments for dark theme */
 canvas {
-    background-color: #2a2a2a; /* Chart background to match card */
+    background-color: #000000; /* Chart background set to black */
     border-radius: 2px;
 }
