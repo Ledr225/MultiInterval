@@ -261,40 +261,43 @@ def generate_plot_data(values):
             x_min_plot = mean_val - 0.1
             x_max_plot = mean_val + 0.1
         else:
-            # Set epsilon to a very small fixed value to ensure the data range is covered and bins are consistent.
-            # This is safer than 0 to avoid potential edge cases with floating point precision.
             epsilon = 1e-9 
             x_min_plot = x_min_data - epsilon
             x_max_plot = x_max_data + epsilon
 
-        # Number of bins for the histogram - significantly increased for a finer step approximation
-        num_bins = 1000 # Increased for a finer step approximation of a smooth curve
+        # Number of bins for the histogram - still high to define sharp features
+        num_bins = 1000 
         
         counts, bin_edges = np.histogram(values, bins=num_bins, range=(x_min_plot, x_max_plot), density=True)
 
-        # Create step-like data for plotting by duplicating points
+        # Create a much denser set of x_coords for plotting (e.g., 5000 points)
+        # This will make the straight line segments in Chart.js appear smoother
+        num_plot_points = 5000 # Significantly more points for visual smoothness
+        dense_x_coords = np.linspace(x_min_plot, x_max_plot, num_plot_points)
+
         plot_x = []
         plot_y = []
-        for i in range(len(counts)):
-            # Horizontal segment for the current bin
-            plot_x.append(bin_edges[i])
-            plot_y.append(counts[i])
-            
-            plot_x.append(bin_edges[i+1])
-            plot_y.append(counts[i])
-            
-            # Vertical line connecting to the next bin's height (if not the last bin)
-            if i < len(counts) - 1:
-                plot_x.append(bin_edges[i+1])
-                plot_y.append(counts[i+1])
 
-        # Ensure y_vals are non-negative (though histogram counts should be)
+        # Map each dense_x_coord to its corresponding histogram bin value
+        for x_coord in dense_x_coords:
+            # Find which bin this x_coord belongs to
+            # np.digitize returns the index of the bin to which each value in x belongs.
+            # The bin_edges are sorted, so we can use searchsorted.
+            # Subtract 1 because digitize returns bin_idx (1-indexed for bins), or 0 for values < first bin.
+            # np.clip to handle values exactly equal to x_max_plot, placing them in the last bin
+            bin_idx = np.searchsorted(bin_edges, x_coord, side='right') - 1
+            bin_idx = np.clip(bin_idx, 0, len(counts) - 1) # Ensure index is within valid range
+
+            plot_x.append(x_coord)
+            plot_y.append(counts[bin_idx])
+
+        # Ensure y_vals are non-negative
         plot_y = np.array(plot_y)
         plot_y[plot_y < 0] = 0
 
         return plot_x, plot_y.tolist()
     except Exception as e:
-        print(f"Error generating plot data: {e}") # Log the error for debugging
+        print(f"Error generating plot data: {e}") 
         return None, None
 
 # --- Main function to be called from JavaScript ---
