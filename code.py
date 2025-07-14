@@ -11,9 +11,6 @@ class Interval:
     def __init__(self, low, high, low_closed=True, high_closed=True):
         self.low = float(low)
         self.high = float(high)
-        # For simplicity with the new strict parsing, we'll assume intervals parsed are always closed.
-        # If open/closed is still desired, the parsing logic needs to be extended to handle it explicitly
-        # with square brackets, e.g., '[1,5)' or '(1,5]', but the current request implies '[]' for all.
         self.low_closed = low_closed
         self.high_closed = high_closed
 
@@ -36,31 +33,26 @@ class Interval:
 
 def parse_interval(s):
     s = s.strip()
-    # Modified regex to only allow square brackets for intervals
     match = re.match(r'^\[\s*([-\d\.]+)\s*,\s*([-\d\.]+)\s*\]$', s)
     if not match:
         raise ValueError(f"Invalid interval syntax. Must use square brackets, e.g., [1,2]: {s}")
     
-    # Since only square brackets are allowed, they are always closed.
     low_closed = True
     high_closed = True
     
     low = float(match.group(1))
     high = float(match.group(2))
     
-    # Ensure low <= high; swap if necessary and maintain closed status.
     if low > high:
         low, high = high, low
-        # The closed status remains the same since both are square brackets.
         
     return Interval(low, high, low_closed, high_closed)
 
 class MultiInterval:
     def __init__(self, intervals):
-        # Ensure all elements in the list are indeed Interval objects
         if not all(isinstance(i, Interval) for i in intervals):
             raise TypeError("All elements in MultiInterval must be Interval objects.")
-        self.intervals = sorted(intervals, key=lambda x: x.low) # Optional: keep intervals sorted
+        self.intervals = sorted(intervals, key=lambda x: x.low)
 
     def sample(self, prec):
         points = []
@@ -94,17 +86,17 @@ def parse_multiinterval(s):
         else:
             current_part.append(char)
     
-    if current_part: # Add the last part
+    if current_part:
         parts.append("".join(current_part).strip())
 
-    if not parts or (len(parts) == 1 and not parts[0]): # Handle empty multi-interval {}
+    if not parts or (len(parts) == 1 and not parts[0]):
         return MultiInterval([])
 
     intervals = []
     for part in parts:
-        if not part: # Skip empty parts that might result from trailing/leading commas
+        if not part:
             continue
-        intervals.append(parse_interval(part)) # Use the updated parse_interval
+        intervals.append(parse_interval(part))
 
     return MultiInterval(intervals)
 
@@ -120,8 +112,8 @@ token_specification = [
     ('SUB',       r'-'),
     ('LPAREN',    r'\('),
     ('RPAREN',    r'\)'),
-    ('MULTIINT', r'\{(\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*,?)*\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*\}|\{\}'), # Allows empty {} and intervals with []
-    ('INTERVAL', r'\[[-\d\.]+,\s*[-\d\.]+\]'), # Only allows [num,num]
+    ('MULTIINT', r'\{(\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*,?)*\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*\}|\{\}'),
+    ('INTERVAL', r'\[[-\d\.]+,\s*[-\d\.]+\]'),
     ('SKIP',      r'[ \t]+'),
 ]
 
@@ -180,7 +172,7 @@ def shunting_yard(tokens):
             if not stack:
                 raise SyntaxError("Mismatched parentheses")
             stack.pop()
-        else: # Handle unexpected tokens that might slip through
+        else:
             raise SyntaxError(f"Unexpected token in shunting-yard: {token.type} ({token.value})")
 
     while stack:
@@ -243,46 +235,36 @@ def generate_plot_data(values):
     values = np.array(values)
     values = values[np.isfinite(values)]
     if len(values) < 2:
-        # If there's only one unique value (or zero/one value total), KDE might fail or be meaningless.
-        # Handle this by returning the single value for plotting or indicating no distribution.
         if len(np.unique(values)) == 1:
-            # For a single point, we can return a very narrow distribution around it
             single_val = values[0]
-            # Create a very small range for the spike
-            delta = max(0.01, abs(single_val) * 0.001) # Ensure delta is not zero and scales slightly with value
+            delta = max(0.01, abs(single_val) * 0.001)
             x_vals = [single_val - delta, single_val, single_val + delta]
-            y_vals = [0, 1 / (2 * delta), 0] # Make the peak proportional to 1/width for unit area approximation
+            y_vals = [0, 1 / (2 * delta), 0]
             return x_vals, y_vals
-        return None, None # No meaningful data for KDE
+        return None, None
 
     try:
-        # Using a slightly larger bandwidth for smoother curves, less prone to "bleeding" artifacts
-        # Changed bw_method to 0.01 for smoother curves, retaining triangle shape but removing minor "spikes"
-        kde = gaussian_kde(values, bw_method=0.01) # ADJUSTED THIS LINE
+        # Increased bw_method for smoother curves and fewer spikes
+        kde = gaussian_kde(values, bw_method=0.1) # Adjusted this line
         x_min_data, x_max_data = np.min(values), np.max(values)
         
-        # Handle cases where min and max are too close, leading to very small or zero range for plotting
-        if x_max_data - x_min_data < 1e-9: # If data range is effectively zero
+        if x_max_data - x_min_data < 1e-9:
             mean_val = np.mean(values)
-            x_min_plot = mean_val - 0.1 # Define a small arbitrary plotting range
+            x_min_plot = mean_val - 0.1
             x_max_plot = mean_val + 0.1
         else:
-            # Generate x_vals strictly within the observed data range.
-            # Add a very small epsilon to the plotting range to ensure the curve's ends are visible,
-            # but without causing significant overflow.
-            epsilon = (x_max_data - x_min_data) * 0.01 # 1% of the data range
+            epsilon = (x_max_data - x_min_data) * 0.01
             x_min_plot = x_min_data - epsilon
             x_max_plot = x_max_data + epsilon
 
         x_vals = np.linspace(x_min_plot, x_max_plot, 500)
         y_vals = kde(x_vals)
 
-        # Explicitly set negative probability densities (which can sometimes occur with KDE at boundaries) to zero
         y_vals[y_vals < 0] = 0
 
         return x_vals.tolist(), y_vals.tolist()
     except Exception as e:
-        print(f"Error generating plot data: {e}") # Log the error for debugging
+        print(f"Error generating plot data: {e}")
         return None, None
 
 # --- Main function to be called from JavaScript ---
@@ -296,8 +278,17 @@ def run_calculation(expr, min_sample_str):
         if not result:
             return {"error": "Calculation resulted in no valid data points."}
         
-        # status_message = "Calculation completed." # This line is no longer strictly needed as status is managed in JS
         x_data, y_data = generate_plot_data(result)
 
         if x_data is None:
-            return
+            return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for KDE."}
+
+        # IMPORTANT: No 'status' key when successful - JS will hide status by default
+        return {
+            "plot_data": {
+                "x": x_data,
+                "y": y_data
+            }
+        }
+    except Exception as e:
+        return {"error": f"An error occurred: {e}"}
