@@ -54,12 +54,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = pythonResult.toJs ? pythonResult.toJs({ dictConverter: Object.fromEntries }) : pythonResult;
             pythonResult.destroy(); // Clean up PyProxy object
 
+            // --- BEGIN: Added more robust checks for plotData ---
+            if (!data) {
+                statusMessage.textContent = 'Error: Python calculation returned no data or invalid data format.';
+                statusMessage.className = 'status error';
+                console.error('Python calculation returned null or undefined data:', pythonResult);
+                return;
+            }
+
             if (data.error) {
                 statusMessage.textContent = `Error: ${data.error}`;
                 statusMessage.className = 'status error';
                 console.error(data.error);
                 return;
             }
+
+            if (!data.plot_data || !Array.isArray(data.plot_data.x) || !Array.isArray(data.plot_data.y)) {
+                statusMessage.textContent = 'Error: Plot data is missing or incomplete. Cannot render chart.';
+                statusMessage.className = 'status error';
+                console.error('Received data object is missing plot_data or its components (x/y arrays):', data);
+                return;
+            }
+            // --- END: Added more robust checks ---
 
             statusMessage.textContent = data.status || 'Calculation successful.';
             statusMessage.className = 'status success';
