@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             pyodide = await loadPyodide();
             await pyodide.loadPackage(['numpy', 'scipy']);
-            // Fetch the Python code from code.py
             pythonCode = await (await fetch('./code.py')).text();
 
             // Hide loader and enable button
@@ -27,67 +26,53 @@ document.addEventListener('DOMContentLoaded', () => {
             calculateAndPlot();
         } catch (error) {
             console.error('Pyodide initialization failed:', error);
-            loaderOverlay.innerHTML = `<div class=\"loader-content\"><p>Error initializing environment.</p><small>${error.message}</small></div>`;
+            loaderOverlay.innerHTML = `<div class="loader-content"><p>Error initializing environment.</p><small>${error.message}</small></div>`;
         }
     }
 
     // --- Calculation Logic ---
     async function calculateAndPlot() {
         if (!pyodide) {
-            statusMessage.textContent = 'Error: Python environment not loaded.';
+            statusMessage.textContent = 'Pyodide is not ready.';
             statusMessage.className = 'status error';
             return;
         }
 
-        const expr = expressionInput.value;
-        const minSample = minSampleInput.value;
-
+        // Show loading state
         statusMessage.textContent = 'Calculating...';
-        statusMessage.className = 'status info';
-        calculateBtn.disabled = true;
+        statusMessage.className = 'status loading';
+        if (resultChart) {
+            resultChart.destroy();
+        }
+
+        const expression = expressionInput.value;
+        const min_sample = minSampleInput.value;
 
         try {
-            // Ensure the Python code is re-run with the latest version
-            await pyodide.runPythonAsync(pythonCode);
-            const pythonResult = await pyodide.globals.get('run_calculation')(expr, minSample);
-            
-            // Convert PyProxy to JS object if necessary
-            const data = pythonResult.toJs ? pythonResult.toJs({ dictConverter: Object.fromEntries }) : pythonResult;
-            pythonResult.destroy(); // Clean up PyProxy object
-
-            // --- IMPORTANT: Robust checks for plotData ---
-            if (!data) {
-                statusMessage.textContent = 'Error: Python calculation returned no data or an invalid data format.';
-                statusMessage.className = 'status error';
-                console.error('Python calculation returned null or undefined data:', pythonResult);
-                return;
-            }
+            // Run the Python code in the Pyodide environment
+            pyodide.runPython(pythonCode);
+            // Get the main function from Python
+            const runCalculation = pyodide.globals.get('run_calculation');
+            // Call the function and get the result
+            const result = runCalculation(expression, min_sample);
+            const data = result.toJs({ dict_converter: Object.fromEntries }); // Convert Python dict to JS object
+            result.destroy(); // Clean up memory
 
             if (data.error) {
-                statusMessage.textContent = `Error: ${data.error}`;
-                statusMessage.className = 'status error';
-                console.error(data.error);
-                return;
+                throw new Error(data.error);
             }
+            
+            // --- MODIFICATION 1: Hide successful status message ---
+            statusMessage.style.display = 'none'; // Hide the element
 
-            if (!data.plot_data || !Array.isArray(data.plot_data.x) || !Array.isArray(data.plot_data.y)) {
-                statusMessage.textContent = 'Error: Plot data is missing or incomplete. Cannot render chart.';
-                statusMessage.className = 'status error';
-                console.error('Received data object is missing plot_data or its components (x/y arrays):', data);
-                return;
-            }
-            // --- End of robust checks ---
-
-            statusMessage.textContent = data.status || 'Calculation successful.';
-            statusMessage.className = 'status success';
             renderChart(data.plot_data);
 
         } catch (error) {
+            // Only show error messages
+            statusMessage.style.display = 'block'; // Ensure error message is visible
             statusMessage.textContent = `Error: ${error.message}`;
             statusMessage.className = 'status error';
             console.error(error);
-        } finally {
-            calculateBtn.disabled = false;
         }
     }
 
@@ -103,22 +88,37 @@ document.addEventListener('DOMContentLoaded', () => {
                     data: plotData.y,
                     borderColor: 'rgb(54, 162, 235)',
                     backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    fill: true,
+                    fill: 'origin', // Changed fill to 'origin' to prevent filling below the actual data points
                     borderWidth: 2,
                     pointRadius: 0,
-                    // Set tension to 0 for straight lines between points, removing Chart.js Bezier smoothing
-                    tension: 0 
+                    tension: 0.1
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: { type: 'linear', title: { display: true, text: 'Value' } },
-                    y: { beginAtZero: true, title: { display: true, text: 'Probability Density' } }
+                    x: { 
+                        type: 'linear', 
+                        title: { display: true, text: 'Value' } 
+                    },
+                    y: { 
+                        beginAtZero: true, 
+                        title: { display: true, text: 'Probability Density' },
+                        // --- MODIFICATION 3: Hide Y-axis labels ---
+                        ticks: {
+                            display: false // Hide the actual tick labels
+                        },
+                        grid: {
+                            drawOnChartArea: false // Optionally hide horizontal grid lines
+                        }
+                    }
                 },
                 plugins: {
-                    title: { display: true, text: `Result Distribution for: ${expressionInput.value}` }
+                    title: { display: true, text: `Result Distribution for: ${expressionInput.value}` },
+                    legend: {
+                        display: false // Optionally hide the dataset label 'Approximate Probability Density'
+                    }
                 }
             }
         });
