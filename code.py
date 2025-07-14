@@ -3,7 +3,9 @@ import operator
 import numpy as np
 from scipy.stats import gaussian_kde
 
-# ... (Previous classes and functions like Interval, parse_interval, MultiInterval, parse_multiinterval, Token, tokenize, shunting_yard, ops_map, eval_rpn, auto_eval_expression remain unchanged as per your previous request) ...
+# --- All your original classes and functions go here ---
+# (Interval, parse_interval, MultiInterval, parse_multiinterval, Token, tokenize,
+#  shunting_yard, eval_rpn, auto_eval_expression, etc.)
 
 class Interval:
     def __init__(self, low, high, low_closed=True, high_closed=True):
@@ -254,38 +256,30 @@ def generate_plot_data(values):
         return None, None # No meaningful data for KDE
 
     try:
+        # Using a slightly larger bandwidth for smoother curves, less prone to "bleeding" artifacts
         kde = gaussian_kde(values, bw_method=0.05) 
-        x_min, x_max = np.min(values), np.max(values)
+        x_min_data, x_max_data = np.min(values), np.max(values)
         
-        # Handle cases where min and max are too close, leading to division by zero or very small range
-        if x_max - x_min < 1e-9: # If range is effectively zero
-            # If the range is extremely small, create a sensible default plotting range
+        # Handle cases where min and max are too close, leading to very small or zero range for plotting
+        if x_max_data - x_min_data < 1e-9: # If data range is effectively zero
             mean_val = np.mean(values)
-            x_min = mean_val - 0.1
-            x_max = mean_val + 0.1
+            x_min_plot = mean_val - 0.1 # Define a small arbitrary plotting range
+            x_max_plot = mean_val + 0.1
+        else:
+            # Generate x_vals strictly within the observed data range.
+            # Add a very small epsilon to the plotting range to ensure the curve's ends are visible,
+            # but without causing significant overflow.
+            epsilon = (x_max_data - x_min_data) * 0.01 # 1% of the data range
+            x_min_plot = x_min_data - epsilon
+            x_max_plot = x_max_data + epsilon
 
-        # Use a smaller padding to keep the plot tightly around the data.
-        # The 'useless line' is often caused by the plotting range extending far beyond data.
-        # Chart.js 'fill: origin' also helps ensure it doesn't draw below zero outside data range.
-        padding = (x_max - x_min) * 0.02 # Reduced padding from 0.05 to 0.02
-        x_vals = np.linspace(x_min - padding, x_max + padding, 500)
+        x_vals = np.linspace(x_min_plot, x_max_plot, 500)
         y_vals = kde(x_vals)
 
-        # To try and explicitly cut off values where y is very close to zero:
-        # Find indices where y_vals are significant
-        significant_indices = np.where(y_vals > 1e-6)[0] # Threshold for "significant" density
-        if len(significant_indices) > 0:
-            first_significant = significant_indices[0]
-            last_significant = significant_indices[-1]
-            
-            # Extend slightly to include points just before/after the significant range for a smoother drop
-            start_index = max(0, first_significant - 5) 
-            end_index = min(len(x_vals) - 1, last_significant + 5)
-            
-            x_vals = x_vals[start_index:end_index+1].tolist()
-            y_vals = y_vals[start_index:end_index+1].tolist()
+        # Explicitly set negative probability densities (which can sometimes occur with KDE at boundaries) to zero
+        y_vals[y_vals < 0] = 0
 
-        return x_vals, y_vals
+        return x_vals.tolist(), y_vals.tolist()
     except Exception as e:
         print(f"Error generating plot data: {e}") # Log the error for debugging
         return None, None
@@ -301,15 +295,15 @@ def run_calculation(expr, min_sample_str):
         if not result:
             return {"error": "Calculation resulted in no valid data points."}
         
-        # Removed status_message from here as it will not be displayed by JS
-        # status_message = f"Calculation successful. Used precision: {used_prec} (found {len(result)} sample points)."
+        # The 'status' field is included but JS will hide it on success.
+        status_message = "Calculation completed." 
         x_data, y_data = generate_plot_data(result)
 
         if x_data is None:
              return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for KDE."}
 
         return {
-            "status": "Calculation completed.", # Simplified message, but will be hidden
+            "status": status_message, # This status will be passed, but JS will hide it on success
             "plot_data": {
                 "x": x_data,
                 "y": y_data
