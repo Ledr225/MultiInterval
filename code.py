@@ -29,7 +29,6 @@ class Interval:
 
 def parse_interval(s):
     s = s.strip()
-    # Reverting to original parsing for open/closed intervals
     match = re.match(r'^([\[\(])\s*([-\d\.]+)\s*,\s*([-\d\.]+)\s*([\]\)])$', s)
     if not match:
         raise ValueError(f"Invalid interval syntax: {s}")
@@ -37,8 +36,6 @@ def parse_interval(s):
     high_closed = match.group(4) == ']'
     low = float(match.group(2))
     high = float(match.group(3))
-    # Note: user's parse_interval swaps low/high and open/closed status if low > high.
-    # This might be intended for symmetry, let's keep that behavior.
     if low > high:
         low, high = high, low
         low_closed, high_closed = high_closed, low_closed
@@ -46,11 +43,9 @@ def parse_interval(s):
 
 class MultiInterval:
     def __init__(self, intervals):
-        # User's provided code does not sort intervals here.
-        # Ensure all elements in the list are indeed Interval objects
         if not all(isinstance(i, Interval) for i in intervals):
             raise TypeError("All elements in MultiInterval must be Interval objects.")
-        self.intervals = intervals # User's code does not sort here
+        self.intervals = intervals
 
     def sample(self, prec):
         points = []
@@ -68,7 +63,7 @@ def parse_multiinterval(s):
     inner = s[1:-1].strip()
     
     parts = []
-    depth = 0 # To track nested brackets for intervals
+    depth = 0
     buf = ''
     for ch in inner:
         if ch in '[(':
@@ -76,21 +71,21 @@ def parse_multiinterval(s):
         elif ch in '])':
             depth -= 1
         
-        if ch == ',' and depth == 0: # Only split by comma if not inside an interval
+        if ch == ',' and depth == 0:
             parts.append(buf.strip())
             buf = ''
         else:
             buf += ch
     
-    if buf: # Add the last part if any
+    if buf:
         parts.append(buf.strip())
 
-    if not parts or (len(parts) == 1 and not parts[0]): # Handle empty multi-interval {}
+    if not parts or (len(parts) == 1 and not parts[0]):
         return MultiInterval([])
 
     intervals = []
     for part in parts:
-        if not part: # Skip empty parts that might result from trailing/leading commas
+        if not part:
             continue
         intervals.append(parse_interval(part))
 
@@ -108,9 +103,8 @@ token_specification = [
     ('SUB',      r'-'),
     ('LPAREN',   r'\('),
     ('RPAREN',   r'\)',),
-    # Reverting regex for MULTIINT and INTERVAL to match user's provided file
-    ('MULTIINT', r'\{[^}]*\}'), # More general, relies on parse_multiinterval for detail
-    ('INTERVAL', r'[\[\(][^\]\)]*[\]\)]'), # More general, relies on parse_interval for detail
+    ('MULTIINT', r'\{[^}]*\}'),
+    ('INTERVAL', r'[\[\(][^\]\)]*[\]\)]'),
     ('SKIP',     r'[ \t]+'),
 ]
 
@@ -169,7 +163,7 @@ def shunting_yard(tokens):
             if not stack:
                 raise SyntaxError("Mismatched parentheses")
             stack.pop()
-        else: # Handle unexpected tokens that might slip through
+        else:
             raise SyntaxError(f"Unexpected token in shunting-yard: {token.type} ({token.value})")
 
     while stack:
@@ -188,4 +182,105 @@ def eval_rpn(rpn_tokens, prec):
     stack = []
     for token in rpn_tokens:
         if token.type == 'NUMBER':
-            stack.append
+            stack.append([float(token.value)])
+        elif token.type == 'INTERVAL':
+            mi = MultiInterval([parse_interval(token.value)])
+            stack.append(mi.sample(prec))
+        elif token.type == 'MULTIINT':
+            mi = parse_multiinterval(token.value)
+            stack.append(mi.sample(prec))
+        elif token.type in ops_map:
+            if len(stack) < 2:
+                raise ValueError("Insufficient operands for operator")
+            b = stack.pop()
+            a = stack.pop()
+            func = ops_map[token.type]
+            result = []
+            for x in a:
+                for y in b:
+                    if func in (operator.truediv, operator.floordiv) and y == 0:
+                        continue
+                    try:
+                        r = func(x, y)
+                        result.append(r)
+                    except Exception:
+                        continue
+            stack.append(result)
+        else:
+            raise ValueError(f"Unknown token type: {token.type}")
+    if len(stack) != 1:
+        raise ValueError("Invalid expression structure")
+    return stack[0]
+
+def auto_eval_expression(rpn, minimum_sample, max_prec=1000000):
+    prec = 1
+    result = []
+    while prec <= max_prec:
+        result = eval_rpn(rpn, prec)
+        if len(result) >= minimum_sample:
+            return result, prec
+        prec *= 2
+    return result, prec
+
+def generate_plot_data(values):
+    values = np.array(values)
+    values = values[np.isfinite(values)]
+
+    if len(values) < 2:
+        if len(np.unique(values)) == 1 and len(values) > 0:
+            single_val = values[0]
+            delta = max(0.01, abs(single_val) * 0.001) 
+            x_vals = [single_val - delta, single_val, single_val + delta]
+            y_vals = [0, 1 / (2 * delta), 0]
+            return x_vals, y_vals
+        return None, None
+
+    try:
+        # *** CHANGED: Use 'silverman' for bw_method for more robust smoothing ***
+        kde = gaussian_kde(values, bw_method='silverman') 
+
+        x_min_data, x_max_data = np.min(values), np.max(values)
+        
+        padding = (x_max_data - x_min_data) * 0.05
+        if x_max_data - x_min_data < 1e-9:
+            x_min_plot = x_min_data - 0.1
+            x_max_plot = x_max_data + 0.1
+        else:
+            x_min_plot = x_min_data - padding
+            x_max_plot = x_max_data + padding
+        
+        x_vals = np.linspace(x_min_plot, x_max_plot, 1000)
+        y_vals = kde(x_vals)
+
+        y_vals[y_vals < 0] = 0
+
+        return x_vals.tolist(), y_vals.tolist()
+    except Exception as e:
+        print(f"Error generating plot data: {e}") 
+        return None, None
+
+def run_calculation(expr, min_sample_str):
+    try:
+        minimum_sample = int(min_sample_str)
+        tokens = tokenize(expr)
+        rpn = shunting_yard(tokens)
+        result, used_prec = auto_eval_expression(rpn, minimum_sample)
+
+        if not result:
+            return {"error": "Calculation resulted in no valid data points."}
+        
+        status_message = "Calculation completed." 
+        x_data, y_data = generate_plot_data(result)
+
+        if x_data is None:
+             return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for plot."}
+
+        return {
+            "status": status_message, 
+            "plot_data": {
+                "x": x_data,
+                "y": y_data
+            }
+        }
+    except Exception as e:
+        return {"error": f"An error occurred: {e}"}
