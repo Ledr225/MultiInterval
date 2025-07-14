@@ -19,7 +19,7 @@ class Interval:
 
     def contains(self, x):
         return (self.low <= x if self.low_closed else self.low < x) and \
-               (x <= self.high if self.high_closed else x < self.high)
+               (x <= self.high if self.high_closed else x < x)
 
     def sample(self, prec):
         if self.high == self.low:
@@ -261,14 +261,14 @@ def generate_plot_data(values):
             x_min_plot = mean_val - 0.1
             x_max_plot = mean_val + 0.1
         else:
-            # Use a very minimal epsilon, primarily to ensure bin edges cover the data range exactly
-            # and potentially extend slightly to show zero probability outside.
-            epsilon = (x_max_data - x_min_data) * 0.001 # Even smaller epsilon (0.1% of range)
+            # Set epsilon to a very small fixed value to ensure the data range is covered and bins are consistent.
+            # This is safer than 0 to avoid potential edge cases with floating point precision.
+            epsilon = 1e-9 
             x_min_plot = x_min_data - epsilon
             x_max_plot = x_max_data + epsilon
 
-        # Number of bins for the histogram - increased for more detail if needed, but the step-like plot is key
-        num_bins = 200 # Increased number of bins to make steps finer
+        # Number of bins for the histogram - significantly increased for a finer step approximation
+        num_bins = 1000 # Increased for a finer step approximation of a smooth curve
         
         counts, bin_edges = np.histogram(values, bins=num_bins, range=(x_min_plot, x_max_plot), density=True)
 
