@@ -1,3 +1,4 @@
+# code.py
 import re
 import operator
 import numpy as np
@@ -5,7 +6,7 @@ from scipy.stats import gaussian_kde
 
 # --- All your original classes and functions go here ---
 # (Interval, parse_interval, MultiInterval, parse_multiinterval, Token, tokenize,
-#  shunting_yard, eval_rpn, auto_eval_expression, etc.)
+#  shunting_yard, eval_rpn, auto_eval_expression, etc.)
 
 class Interval:
     def __init__(self, low, high, low_closed=True, high_closed=True):
@@ -45,7 +46,7 @@ def parse_interval(s):
     
     if low > high:
         low, high = high, low
-        
+    
     return Interval(low, high, low_closed, high_closed)
 
 class MultiInterval:
@@ -226,68 +227,4 @@ def auto_eval_expression(rpn, minimum_sample, max_prec=1000000):
     result = []
     while prec <= max_prec:
         result = eval_rpn(rpn, prec)
-        if len(result) >= minimum_sample:
-            return result, prec
-        prec *= 2
-    return result, prec
-
-def generate_plot_data(values):
-    values = np.array(values)
-    values = values[np.isfinite(values)]
-    if len(values) < 2:
-        if len(np.unique(values)) == 1:
-            single_val = values[0]
-            delta = max(0.01, abs(single_val) * 0.001)
-            x_vals = [single_val - delta, single_val, single_val + delta]
-            y_vals = [0, 1 / (2 * delta), 0]
-            return x_vals, y_vals
-        return None, None
-
-    try:
-        # Reverted bw_method to 0.01 as per user's provided code for smoothing
-        kde = gaussian_kde(values, bw_method=0.01) # Adjusted this line
-        x_min_data, x_max_data = np.min(values), np.max(values)
-        
-        if x_max_data - x_min_data < 1e-9:
-            mean_val = np.mean(values)
-            x_min_plot = mean_val - 0.1
-            x_max_plot = mean_val + 0.1
-        else:
-            epsilon = (x_max_data - x_min_data) * 0.01
-            x_min_plot = x_min_data - epsilon
-            x_max_plot = x_max_data + epsilon
-
-        x_vals = np.linspace(x_min_plot, x_max_plot, 500)
-        y_vals = kde(x_vals)
-
-        y_vals[y_vals < 0] = 0
-
-        return x_vals.tolist(), y_vals.tolist()
-    except Exception as e:
-        print(f"Error generating plot data: {e}")
-        return None, None
-
-# --- Main function to be called from JavaScript ---
-def run_calculation(expr, min_sample_str):
-    try:
-        minimum_sample = int(min_sample_str)
-        tokens = tokenize(expr)
-        rpn = shunting_yard(tokens)
-        result, used_prec = auto_eval_expression(rpn, minimum_sample)
-
-        if not result:
-            return {"error": "Calculation resulted in no valid data points."}
-        
-        x_data, y_data = generate_plot_data(result)
-
-        if x_data is None:
-            return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for KDE."}
-
-        return {
-            "plot_data": {
-                "x": x_data,
-                "y": y_data
-            }
-        }
-    except Exception as e:
-        return {"error": f"An error occurred: {e}"}
+        if len(result) >= minimum
