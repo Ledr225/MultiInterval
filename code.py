@@ -110,19 +110,19 @@ def parse_multiinterval(s):
 
 
 token_specification = [
-    ('NUMBER',   r'-?\d+(\.\d+)?'),
-    ('POW',      r'\^'),
+    ('NUMBER',    r'-?\d+(\.\d+)?'),
+    ('POW',       r'\^'),
     ('FLOORDIV', r'//'),
-    ('MOD',      r'%'),
-    ('MUL',      r'\*'),
-    ('DIV',      r'/'),
-    ('ADD',      r'\+'),
-    ('SUB',      r'-'),
-    ('LPAREN',   r'\('),
-    ('RPAREN',   r'\)'),
+    ('MOD',       r'%'),
+    ('MUL',       r'\*'),
+    ('DIV',       r'/'),
+    ('ADD',       r'\+'),
+    ('SUB',       r'-'),
+    ('LPAREN',    r'\('),
+    ('RPAREN',    r'\)'),
     ('MULTIINT', r'\{(\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*,?)*\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*\}|\{\}'), # Allows empty {} and intervals with []
     ('INTERVAL', r'\[[-\d\.]+,\s*[-\d\.]+\]'), # Only allows [num,num]
-    ('SKIP',     r'[ \t]+'),
+    ('SKIP',      r'[ \t]+'),
 ]
 
 tok_regex = '|'.join('(?P<%s>%s)' % pair for pair in token_specification)
@@ -295,7 +295,6 @@ def run_calculation(expr, min_sample_str):
         if not result:
             return {"error": "Calculation resulted in no valid data points."}
         
-        # The 'status' field is included but JS will hide it on success.
         status_message = "Calculation completed." 
         x_data, y_data = generate_plot_data(result)
 
