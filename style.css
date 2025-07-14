@@ -1,13 +1,13 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #f0f2f5; /* Light gray background */
+    background-color: #f0f2f5;
     color: #1c1e21;
     margin: 0;
-    padding: 0; /* Removed body padding */
-    display: flex; /* Use flexbox for overall layout */
-    justify-content: center; /* Center content block horizontally */
-    align-items: flex-start; /* Align content block to the top */
-    min-height: 100vh; /* Ensure body takes full viewport height */
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
 }
 
 /* Loader Overlay */
@@ -54,23 +54,23 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-/* Main Container - Adjusted for new layout */
+/* Main Container */
 .container {
-    width: 100%; /* Allow it to take full width within flex container */
-    max-width: 960px; /* Set a maximum width for the content */
-    padding: 30px; /* Padding inside the container */
+    width: 100%;
+    max-width: 960px;
+    padding: 30px;
     background: #ffffff;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    margin: 30px 20px; /* Top/Bottom margin, Left/Right margin for spacing from edges */
-    box-sizing: border-box; /* Include padding in the element's total width and height */
+    margin: 30px 20px;
+    box-sizing: border-box;
 }
 
 header {
     text-align: center;
     margin-bottom: 2rem;
     border-bottom: 1px solid #ddd;
-    padding-bottom: 0.5rem; /* Adjusted padding after removing h1 */
+    padding-bottom: 0.5rem;
 }
 
 .card {
@@ -109,7 +109,7 @@ button:disabled { background-color: #a0bdf5; cursor: not-allowed; }
     display: none; /* Hide by default */
 }
 .status.loading { display: block; background-color: #e7f3ff; color: #1877f2; }
-/* .status.success no longer explicitly sets display: block here, JS manages it by clearing text/class */
+/* No .status.success rule with display: block, as it's now controlled by JS clearing the class */
 .status.error { display: block; background-color: #ffebee; color: #f44336; }
 
 .chart-container {
