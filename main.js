@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const minSample = minSampleInput.value;
 
         statusMessage.textContent = 'Calculating...';
-        statusMessage.className = 'status info';
+        statusMessage.className = 'status loading'; // Set to loading state
         calculateBtn.disabled = true;
 
         try {
@@ -52,8 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const pythonResultPyProxy = await pyodide.globals.get('run_calculation')(expr, minSample);
             
             // Convert PyProxy to JS object.
-            // Even with dict_converter, nested PyProxy Maps sometimes occur.
-            // We'll handle the 'plot_data' specifically below if it's still a Map.
             const data = pythonResultPyProxy.toJs({ dict_converter: Object.fromEntries });
             pythonResultPyProxy.destroy(); // Clean up PyProxy object
 
@@ -99,8 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             // --- End of robust checks ---
 
-            statusMessage.textContent = data.status || 'Calculation successful.';
-            statusMessage.className = 'status success';
+            // **MODIFICATION for status message removal:**
+            statusMessage.textContent = ''; // Clear text content
+            statusMessage.className = 'status'; // Reset class to `display: none;` from CSS
+
             renderChart(plotDataForChart);
 
         } catch (error) {
