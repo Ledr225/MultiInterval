@@ -49,18 +49,18 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // Ensure the Python code is re-run with the latest version
             await pyodide.runPythonAsync(pythonCode);
-            const pythonResult = await pyodide.globals.get('run_calculation')(expr, minSample);
+            const pythonResultPyProxy = await pyodide.globals.get('run_calculation')(expr, minSample);
             
-            // Convert PyProxy to JS object, ensuring nested dicts are also converted
-            // We'll explicitly check for Map objects later if this doesn't fully convert
-            const data = pythonResult.toJs ? pythonResult.toJs({ dictConverter: Object.fromEntries }) : pythonResult;
-            pythonResult.destroy(); // Clean up PyProxy object
+            // --- MODIFICATION HERE: Use pyodide.toJs() with `dict_converter` for full conversion ---
+            // Convert PyProxy to JS object, ensuring all nested dicts are converted
+            const data = pythonResultPyProxy.toJs({ dict_converter: Object.fromEntries });
+            pythonResultPyProxy.destroy(); // Clean up PyProxy object
 
             // --- IMPORTANT: Robust checks for plotData ---
             if (!data) {
                 statusMessage.textContent = 'Error: Python calculation returned no data or an invalid data format.';
                 statusMessage.className = 'status error';
-                console.error('Python calculation returned null or undefined data:', pythonResult);
+                console.error('Python calculation returned null or undefined data:', pythonResultPyProxy); // Log the original PyProxy if needed
                 return;
             }
 
@@ -71,29 +71,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Determine if plot_data is a Map or plain object
-            let plotDataForChart;
-            if (data.plot_data instanceof Map) {
-                // Access 'x' and 'y' using .get() for Map objects
-                plotDataForChart = {
-                    x: data.plot_data.get('x'),
-                    y: data.plot_data.get('y')
-                };
-            } else if (data.plot_data && typeof data.plot_data === 'object') {
-                // Assume it's a plain object
-                plotDataForChart = data.plot_data;
-            } else {
-                statusMessage.textContent = 'Error: Plot data is missing or has an unexpected format.';
-                statusMessage.className = 'status error';
-                console.error('Received data object has invalid plot_data:', data);
-                return;
-            }
+            // After the recursive toJs conversion, plot_data should now reliably be a plain object
+            const plotDataForChart = data.plot_data;
 
             // Final check that x and y are arrays
-            if (!Array.isArray(plotDataForChart.x) || !Array.isArray(plotDataForChart.y)) {
+            if (!plotDataForChart || !Array.isArray(plotDataForChart.x) || !Array.isArray(plotDataForChart.y)) {
                 statusMessage.textContent = 'Error: Plot data (x/y components) are not valid arrays. Cannot render chart.';
                 statusMessage.className = 'status error';
-                console.error('Plot data components are not arrays:', plotDataForChart);
+                console.error('Plot data components are not arrays after conversion:', plotDataForChart);
                 return;
             }
             // --- End of robust checks ---
