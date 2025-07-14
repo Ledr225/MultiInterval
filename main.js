@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             pyodide = await loadPyodide();
             await pyodide.loadPackage(['numpy', 'scipy']);
+            // Fetch the Python code from code.py
             pythonCode = await (await fetch('./code.py')).text();
 
             // Hide loader and enable button
@@ -54,12 +55,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = pythonResult.toJs ? pythonResult.toJs({ dictConverter: Object.fromEntries }) : pythonResult;
             pythonResult.destroy(); // Clean up PyProxy object
 
+            // --- IMPORTANT: Robust checks for plotData ---
+            if (!data) {
+                statusMessage.textContent = 'Error: Python calculation returned no data or an invalid data format.';
+                statusMessage.className = 'status error';
+                console.error('Python calculation returned null or undefined data:', pythonResult);
+                return;
+            }
+
             if (data.error) {
                 statusMessage.textContent = `Error: ${data.error}`;
                 statusMessage.className = 'status error';
                 console.error(data.error);
                 return;
             }
+
+            if (!data.plot_data || !Array.isArray(data.plot_data.x) || !Array.isArray(data.plot_data.y)) {
+                statusMessage.textContent = 'Error: Plot data is missing or incomplete. Cannot render chart.';
+                statusMessage.className = 'status error';
+                console.error('Received data object is missing plot_data or its components (x/y arrays):', data);
+                return;
+            }
+            // --- End of robust checks ---
 
             statusMessage.textContent = data.status || 'Calculation successful.';
             statusMessage.className = 'status success';
@@ -89,7 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     fill: true,
                     borderWidth: 2,
                     pointRadius: 0,
-                    tension: 0.1 // Default Chart.js tension
+                    // Set tension to 0 for straight lines between points, removing Chart.js Bezier smoothing
+                    tension: 0 
                 }]
             },
             options: {
