@@ -257,7 +257,8 @@ def generate_plot_data(values):
 
     try:
         # Using a slightly larger bandwidth for smoother curves, less prone to "bleeding" artifacts
-        kde = gaussian_kde(values, bw_method=0.001) 
+        # Changed bw_method to 0.01 for smoother curves, retaining triangle shape but removing minor "spikes"
+        kde = gaussian_kde(values, bw_method=0.01) # ADJUSTED THIS LINE
         x_min_data, x_max_data = np.min(values), np.max(values)
         
         # Handle cases where min and max are too close, leading to very small or zero range for plotting
@@ -295,18 +296,8 @@ def run_calculation(expr, min_sample_str):
         if not result:
             return {"error": "Calculation resulted in no valid data points."}
         
-        status_message = "Calculation completed." 
+        # status_message = "Calculation completed." # This line is no longer strictly needed as status is managed in JS
         x_data, y_data = generate_plot_data(result)
 
         if x_data is None:
-             return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for KDE."}
-
-        return {
-            "status": status_message, # This status will be passed, but JS will hide it on success
-            "plot_data": {
-                "x": x_data,
-                "y": y_data
-            }
-        }
-    except Exception as e:
-        return {"error": f"An error occurred: {e}"}
+            return
