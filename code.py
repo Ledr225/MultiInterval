@@ -116,7 +116,7 @@ class Token:
         self.type = type_
         self.value = value
     def __repr__(self):
-        return f'Token({self.type}, {self.value})')
+        return f'Token({self.type}, {self.value})'
 
 def tokenize(code):
     pos = 0
@@ -236,8 +236,8 @@ def generate_plot_data(values):
         return None, None
 
     try:
-        # *** CHANGED: bw_method set to 0.01 as per user's provided code ***
-        kde = gaussian_kde(values, bw_method=0.01) 
+        # *** CHANGED: Explicitly set bw_method to 0.25 for more smoothing ***
+        kde = gaussian_kde(values, bw_method=0.25) 
 
         x_min_data, x_max_data = np.min(values), np.max(values)
         
