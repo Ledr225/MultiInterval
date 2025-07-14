@@ -96,20 +96,27 @@ header {
 }
 
 /* Button */
-button {
+#calculate-btn { /* Targeted specifically by ID */
     width: 100%;
     padding: 0.75rem;
     font-size: 1rem;
     font-weight: 600;
-    color: #fff;
-    background-color: #0d6efd; /* A vivid blue for action */
+    color: #1a1a1a; /* Black text for the button */
+    background-color: #ffffff; /* White background for the button */
     border: none;
     border-radius: 2px;
     cursor: pointer;
-    transition: background-color 0.2s, opacity 0.2s;
+    transition: background-color 0.2s, opacity 0.2s, color 0.2s; /* Add color to transition */
 }
-button:hover { background-color: #0b5ed7; } /* Slightly darker blue on hover */
-button:disabled { background-color: #5b7194; cursor: not-allowed; } /* Desaturated blue for disabled */
+#calculate-btn:hover { 
+    background-color: #f0f0f0; /* Slightly off-white on hover */
+    color: #000000; /* Ensure text remains black on hover */
+}
+#calculate-btn:disabled { 
+    background-color: #cccccc; /* Light gray for disabled */
+    color: #888888; /* Darker gray text for disabled */
+    cursor: not-allowed; 
+}
 
 /* Status messages - adjusted for dark background */
 .status {
