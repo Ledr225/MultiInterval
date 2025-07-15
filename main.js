@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
            
             loaderOverlay.style.display = 'none';
             calculateBtn.disabled = false;
-            calculateBtn.textContent = 'Calculate & Plot';
+            calculateBtn.textContent = 'Plot';
             
             
             calculateAndPlot();
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   
                     data: plotData.y,
                     borderColor: 'rgb(0, 191, 255)', 
-                    backgroundColor: 'rgba(0, 191, 255, 0.5)', 
+                    backgroundColor: 'rgba(0, 191, 255, 0.2)', 
                     fill: true,
                     borderWidth: 2,
                     pointRadius: 0,
