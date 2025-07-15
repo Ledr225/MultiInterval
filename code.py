@@ -13,7 +13,7 @@ class Interval:
 
     def contains(self, x):
         return (self.low <= x if self.low_closed else self.low < x) and \
-               (x <= self.high if self.high_closed else x < self.high)
+               (x <= self.high if self.high_closed else x < x)
 
     def sample(self, prec):
         if self.high == self.low:
@@ -171,14 +171,11 @@ def shunting_yard(tokens):
             stack.append(token)
             last_token_type = token.type
         elif token.type == 'COMMA': 
-            # Pop operators until a LPAREN is found.
-            # This handles cases like func(a + b, c)
             while stack and stack[-1].type != 'LPAREN':
-                # Ensure we don't pop function tokens prematurely
                 if stack[-1].type in function_tokens:
-                    break # Stop if we hit a function token (should be the function itself)
+                    break 
                 output.append(stack.pop())
-            if not stack or stack[-1].type != 'LPAREN': # Check if a matching '(' was found
+            if not stack or stack[-1].type != 'LPAREN': 
                 raise SyntaxError("Misplaced comma or comma not within function arguments.")
             last_token_type = token.type
         elif token.type in operators:
@@ -247,21 +244,23 @@ function_tokens_eval = set(func_map.keys())
 
 def eval_rpn(rpn_tokens, prec):
     stack = []
+
     for token in rpn_tokens:
         if token.type == 'NUMBER':
             stack.append([float(token.value)])
         elif token.type == 'INTERVAL':
             mi = MultiInterval([parse_interval(token.value)])
-            stack.append(mi.sample(prec))
+            stack.append(mi.sample(prec)) 
         elif token.type == 'MULTIINT':
             mi = parse_multiinterval(token.value)
-            stack.append(mi.sample(prec))
-        elif token.type in ops_map: 
+            stack.append(mi.sample(prec)) 
+        elif token.type in ops_map: # Binary operators
             if len(stack) < 2:
                 raise ValueError(f"Insufficient operands for binary operator {token.type}")
             b = stack.pop()
             a = stack.pop()
             func = ops_map[token.type]
+
             result = []
             for x in a:
                 for y in b:
@@ -269,11 +268,12 @@ def eval_rpn(rpn_tokens, prec):
                         continue 
                     try:
                         r = func(x, y)
-                        result.append(r)
+                        if np.isfinite(r): 
+                            result.append(r)
                     except Exception: 
                         continue
             stack.append(result)
-        elif token.type in function_tokens_eval: 
+        elif token.type in function_tokens_eval: # Unary or multi-argument functions
             func_name = token.type
             func = func_map[func_name]
 
@@ -345,7 +345,7 @@ def generate_plot_data(values):
         return None, None 
 
     try:
-        kde = gaussian_kde(values, bw_method=0.02) 
+        kde = gaussian_kde(values, bw_method=0.01) 
         x_min_data, x_max_data = np.min(values), np.max(values)
         
         if x_max_data - x_min_data < 1e-9: 
