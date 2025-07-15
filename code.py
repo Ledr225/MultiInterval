@@ -283,12 +283,12 @@ def run_calculation(expr, min_sample_str):
         result, used_prec = auto_eval_expression(rpn, minimum_sample)
 
         if not result:
-            return {"error": "Calculation failed.}
+            return {"error": "Calculation resulted in no valid data points."}
         
         x_data, y_data = generate_plot_data(result)
 
         if x_data is None:
-            return {"error": "Could not generate a distribution."}
+            return {"error": "Could not generate a distribution. Result might be a single constant value or insufficient data for KDE."}
 
         return {
             "plot_data": {
