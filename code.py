@@ -3,6 +3,7 @@ import operator
 import numpy as np
 from scipy.stats import gaussian_kde
 
+
 class Interval:
     def __init__(self, low, high, low_closed=True, high_closed=True):
         self.low = float(low)
@@ -135,6 +136,7 @@ def tokenize(code):
         pos = m.end()
     return tokens
 
+#maybe add trig operations later
 precedence = {
     'ADD': 1, 'SUB': 1,
     'MUL': 2, 'DIV': 2, 'MOD': 2, 'FLOORDIV': 2,
