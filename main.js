@@ -10,20 +10,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let pyodide = null;
     let pythonCode = '';
 
-    // --- Main Initialization ---
+    
     async function initialize() {
         try {
             pyodide = await loadPyodide();
             await pyodide.loadPackage(['numpy', 'scipy']);
-            // Fetch the Python code from code.py
+            
             pythonCode = await (await fetch('./code.py')).text();
 
-            // Hide loader and enable button
+           
             loaderOverlay.style.display = 'none';
             calculateBtn.disabled = false;
             calculateBtn.textContent = 'Calculate & Plot';
             
-            // Run a default calculation on load
+            
             calculateAndPlot();
         } catch (error) {
             console.error('Pyodide initialization failed:', error);
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Calculation Logic ---
+    
     async function calculateAndPlot() {
         if (!pyodide) {
             statusMessage.textContent = 'Error: Python environment not loaded.';
@@ -42,11 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const expr = expressionInput.value;
         const minSample = minSampleInput.value;
 
-        // --- Removed "Calculating..." status message ---
-        // statusMessage.textContent = 'Calculating...';
-        // statusMessage.className = 'status loading'; 
-        // --- End removed section ---
-
+        
         calculateBtn.disabled = true;
 
         try {
@@ -85,9 +81,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Always hide status message on successful plot rendering
-            statusMessage.textContent = ''; // Clear text content
-            statusMessage.className = 'status'; // Reset class to `display: none;` from CSS
+           
+            statusMessage.textContent = ''; 
+            statusMessage.className = 'status';
 
             renderChart(plotDataForChart);
 
@@ -108,10 +104,10 @@ document.addEventListener('DOMContentLoaded', () => {
             data: {
                 labels: plotData.x, 
                 datasets: [{
-                    // Removed 'label: 'Probability',' to remove the label from the graph
+                  
                     data: plotData.y,
-                    borderColor: 'rgb(0, 191, 255)', // Brighter blue (Deep Sky Blue)
-                    backgroundColor: 'rgba(0, 191, 255, 0.2)', // More transparent (0.2 alpha)
+                    borderColor: 'rgb(0, 191, 255)', 
+                    backgroundColor: 'rgba(0, 191, 255, 0.5)', 
                     fill: true,
                     borderWidth: 2,
                     pointRadius: 0,
@@ -121,15 +117,14 @@ document.addEventListener('DOMContentLoaded', () => {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: false, // <--- Add this line to disable animation
+                animation: true,
                 scales: {
                     x: { type: 'linear', title: { display: true, text: 'Value' } },
                     y: { beginAtZero: true, title: { display: true, true: 'Probability Density' } }
                 },
                 plugins: {
-                    // Removed the chart title
                     title: { display: false },
-                    legend: { // Add this to remove the legend (label) below the graph
+                    legend: { 
                         display: false
                     }
                 }
