@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   
                     data: plotData.y,
                     borderColor: 'rgb(0, 191, 255)', 
-                    backgroundColor: 'rgba(0, 191, 255, 0.2)', 
+                    backgroundColor: 'rgba(0, 191, 255, 0.125)', 
                     fill: true,
                     borderWidth: 2,
                     pointRadius: 0,
