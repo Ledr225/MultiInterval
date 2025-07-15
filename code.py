@@ -345,7 +345,7 @@ def generate_plot_data(values):
         return None, None 
 
     try:
-        kde = gaussian_kde(values, bw_method=0.05) 
+        kde = gaussian_kde(values, bw_method=0.02) 
         x_min_data, x_max_data = np.min(values), np.max(values)
         
         if x_max_data - x_min_data < 1e-9: 
