@@ -2,7 +2,7 @@ import re
 import operator
 import numpy as np
 from scipy.stats import gaussian_kde
-
+import math # Import the math module for trig and log functions
 
 class Interval:
     def __init__(self, low, high, low_closed=True, high_closed=True):
@@ -97,19 +97,29 @@ def parse_multiinterval(s):
     return MultiInterval(intervals)
 
 token_specification = [
-    ('POW',          r'\^'),
+    ('POW',             r'\^'),
     ('FLOORDIV', r'//'),
-    ('MOD',          r'%'),
-    ('MUL',          r'\*'),
-    ('DIV',          r'/'),
-    ('ADD',          r'\+'),
-    ('SUB',          r'-'),
-    ('NUMBER',       r'\d+(\.\d+)?'),
-    ('LPAREN',       r'\('),
-    ('RPAREN',       r'\)'),
+    ('MOD',             r'%'),
+    ('MUL',             r'\*'),
+    ('DIV',             r'/'),
+    ('ADD',             r'\+'),
+    ('SUB',             r'-'),
+    ('NUMBER',          r'\d+(\.\d+)?'),
+    ('LPAREN',          r'\('),
+    ('RPAREN',          r'\)'),
     ('MULTIINT', r'\{(\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*,?)*\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*\}|\{\}'),
     ('INTERVAL', r'\[[-\d\.]+,\s*[-\d\.]+\]'),
-    ('SKIP',         r'[ \t]+'),
+    ('SKIP',            r'[ \t]+'),
+
+    # New Function Tokens (Order matters for regex - longer matches first!)
+    ('ARCSIN',          r'arcsin'),
+    ('ARCCOS',          r'arccos'),
+    ('ARCTAN',          r'arctan'),
+    ('SIN',             r'sin'),
+    ('COS',             r'cos'),
+    ('TAN',             r'tan'),
+    ('LN',              r'ln'),
+    ('LOG',             r'log'), # Assuming base 10 log if not specified
 ]
 
 tok_regex = '|'.join('(?P<%s>%s)' % pair for pair in token_specification)
@@ -121,6 +131,17 @@ class Token:
         self.value = value
     def __repr__(self):
         return f'Token({self.type}, {self.value})'
+
+precedence = {
+    'ADD': 1, 'SUB': 1,
+    'MUL': 2, 'DIV': 2, 'MOD': 2, 'FLOORDIV': 2,
+    'POW': 3
+}
+right_associative = {'POW'}
+operators = set(precedence.keys())
+
+# Define function tokens for Shunting-yard
+function_tokens = {'SIN', 'COS', 'TAN', 'LOG', 'LN', 'ARCSIN', 'ARCCOS', 'ARCTAN'}
 
 def tokenize(code):
     pos = 0
@@ -136,35 +157,29 @@ def tokenize(code):
         pos = m.end()
     return tokens
 
-#maybe add trig operations later
-precedence = {
-    'ADD': 1, 'SUB': 1,
-    'MUL': 2, 'DIV': 2, 'MOD': 2, 'FLOORDIV': 2,
-    'POW': 3
-}
-right_associative = {'POW'}
-operators = set(precedence.keys())
-
 def shunting_yard(tokens):
     output = []
     stack = []
-    
     last_token_type = None 
 
     for token in tokens:
         if token.type in ('MULTIINT', 'INTERVAL', 'NUMBER'):
             output.append(token)
             last_token_type = token.type
+        elif token.type in function_tokens: # Handle functions
+            stack.append(token)
+            last_token_type = token.type
         elif token.type in operators:
             is_unary = False
             if token.type == 'SUB':
-                if not last_token_type or last_token_type in operators or last_token_type == 'LPAREN':
+                # Check if SUB is unary: if no previous token, or prev was operator, LPAREN, or function
+                if not last_token_type or last_token_type in operators or last_token_type == 'LPAREN' or last_token_type in function_tokens:
                     is_unary = True
 
             if is_unary:
-                output.append(Token('NUMBER', '0'))
-                last_token_type = 'NUMBER'
-            
+                output.append(Token('NUMBER', '0')) # Push a zero for unary minus transformation
+                last_token_type = 'NUMBER' # Treat the zero as a number for next token's context
+             
             while (stack and stack[-1].type in operators):
                 top = stack[-1]
                 if ((token.type not in right_associative and precedence[top.type] >= precedence[token.type]) or
@@ -182,8 +197,13 @@ def shunting_yard(tokens):
                 output.append(stack.pop())
             if not stack:
                 raise SyntaxError("Mismatched parentheses")
-            stack.pop()
-            last_token_type = 'NUMBER'
+            stack.pop() # Pop the LPAREN
+
+            # After popping '(', if the top of the stack is a function, pop it to output
+            if stack and stack[-1].type in function_tokens:
+                output.append(stack.pop())
+
+            last_token_type = 'NUMBER' # A function call or parenthesized expression result is like a number
         else:
             raise SyntaxError(f"Unexpected token in shunting-yard: {token.type} ({token.value})")
 
@@ -199,6 +219,21 @@ ops_map = {
     'FLOORDIV': operator.floordiv, 'POW': operator.pow,
 }
 
+# Map for unary functions
+func_map = {
+    'SIN': math.sin,
+    'COS': math.cos,
+    'TAN': math.tan,
+    'LOG': math.log10, # Base 10 logarithm
+    'LN': math.log,   # Natural logarithm (base e)
+    'ARCSIN': math.asin,
+    'ARCCOS': math.acos,
+    'ARCTAN': math.atan,
+}
+# Keep this set aligned with the function_tokens in shunting_yard for clarity,
+# although it's used for actual evaluation here.
+function_tokens_eval = set(func_map.keys())
+
 def eval_rpn(rpn_tokens, prec):
     stack = []
     for token in rpn_tokens:
@@ -210,9 +245,9 @@ def eval_rpn(rpn_tokens, prec):
         elif token.type == 'MULTIINT':
             mi = parse_multiinterval(token.value)
             stack.append(mi.sample(prec))
-        elif token.type in ops_map:
+        elif token.type in ops_map: # Binary operators
             if len(stack) < 2:
-                raise ValueError("Insufficient operands for operator")
+                raise ValueError(f"Insufficient operands for binary operator {token.type}")
             b = stack.pop()
             a = stack.pop()
             func = ops_map[token.type]
@@ -220,15 +255,32 @@ def eval_rpn(rpn_tokens, prec):
             for x in a:
                 for y in b:
                     if func in (operator.truediv, operator.floordiv) and y == 0:
-                        continue
+                        continue # Skip division by zero
                     try:
                         r = func(x, y)
                         result.append(r)
-                    except Exception:
+                    except Exception: # Catch other potential math errors (e.g., domain errors for pow)
                         continue
+            stack.append(result)
+        elif token.type in function_tokens_eval: # Unary functions
+            if len(stack) < 1:
+                raise ValueError(f"Insufficient operands for function {token.type}")
+            a = stack.pop()
+            func = func_map[token.type]
+            result = []
+            for x in a:
+                try:
+                    r = func(x)
+                    # Filter out non-finite results (NaN, Inf) which can come from domain errors
+                    if not np.isfinite(r):
+                        continue
+                    result.append(r)
+                except Exception: # Catch domain errors (e.g., log of negative, asin outside [-1,1])
+                    continue
             stack.append(result)
         else:
             raise ValueError(f"Unknown token type: {token.type}")
+
     if len(stack) != 1:
         raise ValueError("Invalid expression structure")
     return stack[0]
@@ -245,21 +297,25 @@ def auto_eval_expression(rpn, minimum_sample, max_prec=1000000):
 
 def generate_plot_data(values):
     values = np.array(values)
-    values = values[np.isfinite(values)]
+    values = values[np.isfinite(values)] # Ensure only finite values are used
+    
     if len(values) < 2:
-        if len(np.unique(values)) == 1:
+        if len(np.unique(values)) == 1: # Handle single unique value
             single_val = values[0]
-            delta = max(0.01, abs(single_val) * 0.001)
+            # Create a very narrow triangular distribution around the single value
+            delta = max(0.01, abs(single_val) * 0.001) # Ensure delta is not zero
             x_vals = [single_val - delta, single_val, single_val + delta]
-            y_vals = [0, 1 / (2 * delta), 0]
+            y_vals = [0, 1 / (2 * delta), 0] # A peak at single_val
             return x_vals, y_vals
-        return None, None
+        return None, None # Not enough data for KDE
 
     try:
-        kde = gaussian_kde(values, bw_method=0.01)
+        # Use a fixed bandwidth or consider 'scott' / 'silverman' for automatic selection
+        kde = gaussian_kde(values, bw_method=0.01) 
         x_min_data, x_max_data = np.min(values), np.max(values)
         
-        if x_max_data - x_min_data < 1e-9:
+        # Adjust plot range for very narrow distributions
+        if x_max_data - x_min_data < 1e-9: # If range is almost zero
             mean_val = np.mean(values)
             x_min_plot = mean_val - 0.05
             x_max_plot = mean_val + 0.05
@@ -270,6 +326,7 @@ def generate_plot_data(values):
         x_vals = np.linspace(x_min_plot, x_max_plot, 500)
         y_vals = kde(x_vals)
 
+        # Ensure y_vals are non-negative, as KDE can sometimes produce small negative values
         y_vals[y_vals < 0] = 0
 
         return x_vals.tolist(), y_vals.tolist()
@@ -299,4 +356,5 @@ def run_calculation(expr, min_sample_str):
             }
         }
     except Exception as e:
+        # Provide a more general error message for unexpected exceptions
         return {"error": f"An error occurred: {e}"}
