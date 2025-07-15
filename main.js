@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Elements ---
+   
     const calculateBtn = document.getElementById('calculate-btn');
     const expressionInput = document.getElementById('expression');
     const minSampleInput = document.getElementById('min_sample');
