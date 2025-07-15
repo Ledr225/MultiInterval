@@ -171,10 +171,15 @@ def shunting_yard(tokens):
             stack.append(token)
             last_token_type = token.type
         elif token.type == 'COMMA': 
-            while stack and stack[-1].type != 'LPAREN' and stack[-1].type not in function_tokens:
+            # Pop operators until a LPAREN is found.
+            # This handles cases like func(a + b, c)
+            while stack and stack[-1].type != 'LPAREN':
+                # Ensure we don't pop function tokens prematurely
+                if stack[-1].type in function_tokens:
+                    break # Stop if we hit a function token (should be the function itself)
                 output.append(stack.pop())
-            if not stack or stack[-1].type == 'LPAREN': 
-                 raise SyntaxError("Misplaced comma outside of function arguments.")
+            if not stack or stack[-1].type != 'LPAREN': # Check if a matching '(' was found
+                raise SyntaxError("Misplaced comma or comma not within function arguments.")
             last_token_type = token.type
         elif token.type in operators:
             is_unary = False
