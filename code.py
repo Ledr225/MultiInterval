@@ -1,12 +1,7 @@
-# code.py
 import re
 import operator
 import numpy as np
 from scipy.stats import gaussian_kde
-
-# --- All your original classes and functions go here ---
-# (Interval, parse_interval, MultiInterval, parse_multiinterval, Token, tokenize,
-#  shunting_yard, eval_rpn, auto_eval_expression, etc.)
 
 class Interval:
     def __init__(self, low, high, low_closed=True, high_closed=True):
@@ -64,7 +59,6 @@ class MultiInterval:
     def __repr__(self):
         return f"{{{', '.join(str(i) for i in self.intervals)}}}"
 
-
 def parse_multiinterval(s):
     s = s.strip()
     if not (s.startswith('{') and s.endswith('}')):
@@ -101,21 +95,20 @@ def parse_multiinterval(s):
 
     return MultiInterval(intervals)
 
-
 token_specification = [
-    ('POW',       r'\^'),
+    ('POW',          r'\^'),
     ('FLOORDIV', r'//'),
-    ('MOD',       r'%'),
-    ('MUL',       r'\*'),
-    ('DIV',       r'/'),
-    ('ADD',       r'\+'),
-    ('SUB',       r'-'), # SUB must be before NUMBER to be tokenized correctly
-    ('NUMBER',    r'\d+(\.\d+)?'), # Changed to not include leading optional minus
-    ('LPAREN',    r'\('),
-    ('RPAREN',    r'\)'),
+    ('MOD',          r'%'),
+    ('MUL',          r'\*'),
+    ('DIV',          r'/'),
+    ('ADD',          r'\+'),
+    ('SUB',          r'-'),
+    ('NUMBER',       r'\d+(\.\d+)?'),
+    ('LPAREN',       r'\('),
+    ('RPAREN',       r'\)'),
     ('MULTIINT', r'\{(\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*,?)*\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*\}|\{\}'),
     ('INTERVAL', r'\[[-\d\.]+,\s*[-\d\.]+\]'),
-    ('SKIP',      r'[ \t]+'),
+    ('SKIP',         r'[ \t]+'),
 ]
 
 tok_regex = '|'.join('(?P<%s>%s)' % pair for pair in token_specification)
@@ -154,7 +147,6 @@ def shunting_yard(tokens):
     output = []
     stack = []
     
-    # Track the type of the last token added to the output or stack for unary minus detection
     last_token_type = None 
 
     for token in tokens:
@@ -162,19 +154,15 @@ def shunting_yard(tokens):
             output.append(token)
             last_token_type = token.type
         elif token.type in operators:
-            # Unary minus detection
             is_unary = False
             if token.type == 'SUB':
-                # If it's the first token, or follows an operator, or follows an open parenthesis
                 if not last_token_type or last_token_type in operators or last_token_type == 'LPAREN':
                     is_unary = True
 
             if is_unary:
-                # Treat unary minus as 0 - X. Push 0 to output.
                 output.append(Token('NUMBER', '0'))
-                last_token_type = 'NUMBER' # The 0 is conceptually a number
+                last_token_type = 'NUMBER'
             
-            # Normal operator handling (binary subtraction or other ops)
             while (stack and stack[-1].type in operators):
                 top = stack[-1]
                 if ((token.type not in right_associative and precedence[top.type] >= precedence[token.type]) or
@@ -192,10 +180,8 @@ def shunting_yard(tokens):
                 output.append(stack.pop())
             if not stack:
                 raise SyntaxError("Mismatched parentheses")
-            stack.pop() # Pop the LPAREN
-            # After popping RPAREN, the last token type should be whatever was before the LPAREN.
-            # However, for simplicity, we can assume it's like a number/expression result.
-            last_token_type = 'NUMBER' # A closing parenthesis acts like a number for subsequent operations.
+            stack.pop()
+            last_token_type = 'NUMBER'
         else:
             raise SyntaxError(f"Unexpected token in shunting-yard: {token.type} ({token.value})")
 
@@ -261,10 +247,9 @@ def generate_plot_data(values):
     if len(values) < 2:
         if len(np.unique(values)) == 1:
             single_val = values[0]
-            # For a single point, create a very narrow spike around it
             delta = max(0.01, abs(single_val) * 0.001)
             x_vals = [single_val - delta, single_val, single_val + delta]
-            y_vals = [0, 1 / (2 * delta), 0] # A triangular "distribution" for visualization
+            y_vals = [0, 1 / (2 * delta), 0]
             return x_vals, y_vals
         return None, None
 
@@ -272,10 +257,9 @@ def generate_plot_data(values):
         kde = gaussian_kde(values, bw_method=0.01)
         x_min_data, x_max_data = np.min(values), np.max(values)
         
-        # Set plot range exactly to data min/max, no extra epsilon
         if x_max_data - x_min_data < 1e-9:
             mean_val = np.mean(values)
-            x_min_plot = mean_val - 0.05 # Smaller padding for tiny ranges
+            x_min_plot = mean_val - 0.05
             x_max_plot = mean_val + 0.05
         else:
             x_min_plot = x_min_data
@@ -291,7 +275,6 @@ def generate_plot_data(values):
         print(f"Error generating plot data: {e}")
         return None, None
 
-# --- Main function to be called from JavaScript ---
 def run_calculation(expr, min_sample_str):
     try:
         minimum_sample = int(min_sample_str)
