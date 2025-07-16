@@ -2,7 +2,7 @@ import re
 import operator
 import numpy as np
 from scipy.stats import gaussian_kde
-import math 
+import math
 
 class Interval:
     def __init__(self, low, high, low_closed=True, high_closed=True):
@@ -97,31 +97,31 @@ def parse_multiinterval(s):
     return MultiInterval(intervals)
 
 token_specification = [
-    ('POW',             r'\^'),
-    ('FLOORDIV',        r'//'),
-    ('MOD',             r'%'),
-    ('MUL',             r'\*'),
-    ('DIV',             r'/'),
-    ('ADD',             r'\+'),
-    ('SUB',             r'-'),
-    ('LPAREN',          r'\('),
-    ('RPAREN',          r'\)'),
-    ('COMMA',           r','), 
-    ('MULTIINT',        r'\{(\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*,?)*\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*\}|\{\}'),
-    ('INTERVAL',        r'\[[-\d\.]+,\s*[-\d\.]+\]'),
-    ('SKIP',            r'[ \t]+'),
+    ('POW',              r'\^'),
+    ('FLOORDIV',         r'//'),
+    ('MOD',              r'%'),
+    ('MUL',              r'\*'),
+    ('DIV',              r'/'),
+    ('ADD',              r'\+'),
+    ('SUB',              r'-'),
+    ('LPAREN',           r'\('),
+    ('RPAREN',           r'\)'),
+    ('COMMA',            r','), 
+    ('MULTIINT',         r'\{(\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*,?)*\s*\[[-\d\.]+,\s*[-\d\.]+\]\s*\}|\{\}'),
+    ('INTERVAL',         r'\[[-\d\.]+,\s*[-\d\.]+\]'),
+    ('SKIP',             r'[ \t]+'),
 
-    ('ARCSIN',          r'arcsin'),
-    ('ARCCOS',          r'arccos'),
-    ('ARCTAN',          r'arctan'),
-    ('SIN',             r'sin'),
-    ('COS',             r'cos'),
-    ('TAN',             r'tan'),
-    ('LN',              r'ln'),
-    ('LOG',             r'log'),
-    ('MAX',             r'max'), 
-    ('MIN',             r'min'), 
-    ('NUMBER',          r'\d+(\.\d+)?'), 
+    ('ARCSIN',           r'arcsin'),
+    ('ARCCOS',           r'arccos'),
+    ('ARCTAN',           r'arctan'),
+    ('SIN',              r'sin'),
+    ('COS',              r'cos'),
+    ('TAN',              r'tan'),
+    ('LN',               r'ln'),
+    ('LOG',              r'log'),
+    ('MAX',              r'max'), 
+    ('MIN',              r'min'), 
+    ('NUMBER',           r'\d+(\.\d+)?'), 
 ]
 
 tok_regex = '|'.join('(?P<%s>%s)' % pair for pair in token_specification)
@@ -150,7 +150,6 @@ def tokenize(code):
     while pos < len(code):
         m = get_token(code, pos)
         if not m:
-            # FIX: Escaped the literal curly brace '}' in the f-string
             raise SyntaxError(f'Invalid character or token at position {pos} in expression: "{code}"}}') 
         typ = m.lastgroup
         val = m.group(typ)
@@ -189,7 +188,7 @@ def shunting_yard(tokens):
             if is_unary:
                 output.append(Token('NUMBER', '0')) 
                 last_token_type = 'NUMBER' 
-             
+            
             while (stack and stack[-1].type in operators):
                 top = stack[-1]
                 if ((token.type not in right_associative and precedence[top.type] >= precedence[token.type]) or
@@ -278,29 +277,26 @@ def eval_rpn(rpn_tokens, prec):
             func_name = token.type
             func = func_map[func_name]
 
+            # CORRECTED LOGIC FOR MIN AND MAX
             if func_name in ('MIN', 'MAX'):
-                args_lists = []
-                while stack and isinstance(stack[-1], list):
-                    args_lists.insert(0, stack.pop()) 
-
-                if not args_lists:
-                    raise ValueError(f"Insufficient arguments for {func_name} function.")
-
-                all_values = []
-                for arg_list in args_lists:
-                    all_values.extend(arg_list)
-
+                if len(stack) < 2:
+                    raise ValueError(f"Insufficient operands for {func_name} function.")
+                b = stack.pop()
+                a = stack.pop()
+                
                 result = []
-                if all_values:
-                    finite_values = [v for v in all_values if np.isfinite(v)]
-                    if finite_values: # Only call min/max if there are finite values
+                for x in a:
+                    for y in b:
                         try:
-                            result.append(func(finite_values))
-                        except Exception as e:
-                            print(f"Warning: {func_name} calculation failed on finite values: {e}")
+                            # Use the function directly (min or max)
+                            r = func(x, y)
+                            if np.isfinite(r):
+                                result.append(r)
+                        except Exception:
+                            continue
                 stack.append(result)
 
-            else: 
+            else: # Unary functions
                 if len(stack) < 1:
                     raise ValueError(f"Insufficient operands for function {token.type}")
                 a = stack.pop()
