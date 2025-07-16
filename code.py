@@ -13,7 +13,7 @@ class Interval:
 
     def contains(self, x):
         return (self.low <= x if self.low_closed else self.low < x) and \
-               (x <= self.high if self.high_closed else x < x)
+               (x <= self.high if self.high_closed else x < self.high)
 
     def sample(self, prec):
         if self.high == self.low:
@@ -150,7 +150,7 @@ def tokenize(code):
     while pos < len(code):
         m = get_token(code, pos)
         if not m:
-            raise SyntaxError(f'Invalid character or token at position {pos} in expression: "{code}"')
+            raise SyntaxError(f'Invalid character or token at position {pos} in expression: "{code}"}')
         typ = m.lastgroup
         val = m.group(typ)
         if typ != 'SKIP':
@@ -279,6 +279,7 @@ def eval_rpn(rpn_tokens, prec):
 
             if func_name in ('MIN', 'MAX'):
                 args_lists = []
+                # Pop all lists until a non-list or empty stack is encountered
                 while stack and isinstance(stack[-1], list):
                     args_lists.insert(0, stack.pop()) 
 
@@ -290,17 +291,22 @@ def eval_rpn(rpn_tokens, prec):
                     all_values.extend(arg_list)
 
                 result = []
-                if all_values:
-                    try:
-                        finite_values = [v for v in all_values if np.isfinite(v)]
-                        if finite_values:
-                            result.append(func(finite_values))
-                    except Exception as e:
-                        print(f"Warning: {func_name} calculation failed: {e}")
-                        pass 
-                stack.append(result)
+                if all_values: # Only proceed if there are values to process
+                    finite_values = [v for v in all_values if np.isfinite(v)]
+                    if finite_values: # Only call min/max if there are finite values
+                        try:
+                            # Call the built-in min/max with the list of finite values
+                            result.append(func(finite_values)) 
+                        except Exception as e:
+                            # This catches errors from min/max (e.g., if it receives unorderable types)
+                            print(f"Warning: {func_name} calculation failed on finite values: {e}")
+                            # If min/max itself fails, the result will remain empty, which might propagate an issue.
+                            # For robustness, we could push a NaN or an error marker here, but for now, an empty list.
+                    # If finite_values is empty, result remains empty.
+                # If all_values is empty, result remains empty.
+                stack.append(result) 
 
-            else: 
+            else: # Standard unary functions (sin, cos, log, etc.)
                 if len(stack) < 1:
                     raise ValueError(f"Insufficient operands for function {token.type}")
                 a = stack.pop()
